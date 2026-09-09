@@ -524,8 +524,36 @@ export async function markSendFailed(proposalId: string): Promise<void> {
   await sql`update proposals set status = 'send_failed' where id = ${proposalId}`;
 }
 
-export async function revokeShare(proposalId: string): Promise<void> {
-  await sql`update proposals set share_revoked = true where id = ${proposalId}`;
+/**
+ * Kills a sent proposal's client link. The read path already enforces this —
+ * getProposalByShareToken() filters `share_revoked = false`, so the share
+ * page and its PDF route both 404 the moment this lands.
+ *
+ * `share_token is not null` is the real gate rather than a status check: a
+ * token only ever exists after markSent(), so there is nothing to revoke
+ * before then. One-way by design — there is no un-revoke, because minting a
+ * replacement token for an already-delivered proposal runs into the
+ * delivery one-way-door guards above.
+ */
+export async function revokeShare(
+  proposalId: string,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const rows = await sql`
+    update proposals
+       set share_revoked = true
+     where id = ${proposalId}
+       and share_token is not null
+       and share_revoked = false
+     returning id
+  `;
+  if (rows[0]) return { ok: true };
+
+  const [current] = await sql`
+    select share_token, share_revoked from proposals where id = ${proposalId}
+  `;
+  if (!current) return { ok: false, reason: 'Proposal not found.' };
+  if (current.share_revoked) return { ok: false, reason: 'The client link is already revoked.' };
+  return { ok: false, reason: 'This proposal has no client link to revoke — it has not been sent yet.' };
 }
 
 /* ── supporting materials ─────────────────────────────────────────────────── */

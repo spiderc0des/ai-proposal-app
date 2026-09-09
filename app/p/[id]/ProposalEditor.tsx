@@ -17,6 +17,7 @@ type SerializedProposal = {
   approver_id: string | null;
   rejected_reason: string | null;
   share_token: string | null;
+  share_revoked: boolean;
 };
 
 type SerializedSection = Omit<SectionRow, 'generated_at' | 'edited_at'> & {
@@ -74,6 +75,9 @@ export default function ProposalEditor({
   const [rejecting, setRejecting] = useState(false);
   const [rejectReasonInput, setRejectReasonInput] = useState('');
   const [shareToken, setShareToken] = useState(proposal.share_token);
+  const [shareRevoked, setShareRevoked] = useState(proposal.share_revoked);
+  // Whether the inline "really revoke this?" confirmation is showing.
+  const [revokingShare, setRevokingShare] = useState(false);
   // Only set right after a send THIS session — email delivery detail isn't
   // persisted for display on a later page load, only in the event log.
   const [sendEmailInfo, setSendEmailInfo] = useState<{ sent: boolean; skipped?: boolean; reason?: string } | null>(
@@ -252,6 +256,20 @@ export default function ProposalEditor({
         setShareToken(token);
       }
       setSendEmailInfo(data.email ?? null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleRevokeShare() {
+    setBusy('revoke-share');
+    setError('');
+    try {
+      await api(`/api/proposals/${proposal.id}/revoke-share`, { method: 'POST' });
+      setShareRevoked(true);
+      setRevokingShare(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -470,26 +488,74 @@ export default function ProposalEditor({
       )}
 
       {status === 'sent' && shareToken && (
-        <div className="panel panel-success">
+        <div className={shareRevoked ? 'panel panel-warning' : 'panel panel-success'}>
           <p className="font-semibold mb-2">Sent to the client.</p>
-          <p className="mb-1">
-            Client link:{' '}
-            <a href={`/p/share/${shareToken}`} target="_blank" rel="noreferrer" className="underline break-all">
-              {typeof window !== 'undefined' ? `${window.location.origin}/p/share/${shareToken}` : `/p/share/${shareToken}`}
-            </a>
-          </p>
-          <p>
-            <a href={`/p/share/${shareToken}/pdf`} target="_blank" rel="noreferrer" className="underline">
-              Download the PDF
-            </a>
-          </p>
-          {sendEmailInfo?.skipped && (
+
+          {shareRevoked ? (
+            /* Not just hiding the links — showing a live-looking link that
+               now 404s would be worse than saying plainly that it's off. */
+            <p>Client link revoked — that link and its PDF no longer open for anyone.</p>
+          ) : (
+            <>
+              <p className="mb-1">
+                Client link:{' '}
+                <a href={`/p/share/${shareToken}`} target="_blank" rel="noreferrer" className="underline break-all">
+                  {typeof window !== 'undefined' ? `${window.location.origin}/p/share/${shareToken}` : `/p/share/${shareToken}`}
+                </a>
+              </p>
+              <p>
+                <a href={`/p/share/${shareToken}/pdf`} target="_blank" rel="noreferrer" className="underline">
+                  Download the PDF
+                </a>
+              </p>
+            </>
+          )}
+
+          {sendEmailInfo?.skipped && !shareRevoked && (
             <p className="text-[var(--ink-soft)] mt-2">
               Client email was skipped: {sendEmailInfo.reason} — the link above still works.
             </p>
           )}
           {sendEmailInfo && !sendEmailInfo.sent && !sendEmailInfo.skipped && (
             <p className="text-[var(--red)] mt-2">Client email failed: {sendEmailInfo.reason}</p>
+          )}
+
+          {!shareRevoked && canEdit && (
+            <div className="mt-3">
+              {revokingShare ? (
+                <div className="flex flex-col gap-2">
+                  <p className="label-hint">
+                    Revoke this link? The client can no longer open the proposal or its PDF, and
+                    this can&apos;t be undone — a new link would mean sending a fresh proposal.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleRevokeShare}
+                      disabled={busy !== null}
+                      className="btn btn-danger text-xs"
+                    >
+                      {busy === 'revoke-share' ? 'Revoking…' : 'Confirm revoke'}
+                    </button>
+                    <button
+                      onClick={() => setRevokingShare(false)}
+                      disabled={busy !== null}
+                      className="btn btn-ghost text-xs"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setRevokingShare(true)}
+                  disabled={busy !== null}
+                  className="btn-link text-xs"
+                  style={{ color: 'var(--red)' }}
+                >
+                  Revoke client link
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
