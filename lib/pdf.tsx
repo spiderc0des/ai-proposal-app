@@ -18,9 +18,16 @@ import type { SectionRow } from './db-schemas';
 
 const styles = StyleSheet.create({
   page: { padding: 56, fontFamily: 'Helvetica', fontSize: 10.5, lineHeight: 1.45, color: '#1a2733' },
-  brand: { fontSize: 9, color: '#6b7c8d', marginBottom: 4, fontFamily: 'Helvetica-Bold', letterSpacing: 0.5 },
-  title: { fontSize: 22, fontFamily: 'Helvetica-Bold', color: '#12202c', marginBottom: 4 },
-  meta: { fontSize: 10, color: '#46586b', marginBottom: 24 },
+  brand: { fontSize: 9, color: '#6b7c8d', marginBottom: 6, fontFamily: 'Helvetica-Bold', letterSpacing: 0.5, lineHeight: 1.3 },
+  // Explicit lineHeight, not inherited from `page`: the 22pt bold title's
+  // box was coming out shorter than its actual glyphs (descenders included)
+  // at the inherited 1.45, so the next line (meta) overlapped its bottom.
+  // Standard PDF fonts referenced by name (no Font.register — see the file
+  // header comment) don't carry real metrics into react-pdf's layout pass,
+  // so a heading this size needs the clearance stated explicitly rather
+  // than trusted to inheritance.
+  title: { fontSize: 22, fontFamily: 'Helvetica-Bold', color: '#12202c', lineHeight: 1.3, marginBottom: 10 },
+  meta: { fontSize: 10, color: '#46586b', lineHeight: 1.3, marginBottom: 24 },
   hr: { borderBottomWidth: 1, borderBottomColor: '#d5dee6', marginBottom: 20 },
   h2: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: '#12202c', marginTop: 18, marginBottom: 8 },
   h3: { fontSize: 11.5, fontFamily: 'Helvetica-Bold', color: '#1c4b7a', marginTop: 12, marginBottom: 4 },
