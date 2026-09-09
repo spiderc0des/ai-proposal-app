@@ -18,6 +18,10 @@ intake  →  pre-flight audit  →  full draft  →  review & edit  →  submit
                                                   share link + PDF (rendered
                                                   live, never stored) + email
                                                                      │
+                                                    client accepts or declines
+                                                    (one reminder first, if
+                                                     they go quiet for 2 days)
+                                                                     │
                                                                 events log
                                                    (every step above, ok or not)
 ```
@@ -43,6 +47,8 @@ intake  →  pre-flight audit  →  full draft  →  review & edit  →  submit
   no headless Chromium.
 - **Gmail SMTP** (`nodemailer`) for the app's own client-delivery and
   approver-notification emails.
+- **Vercel Cron** (`vercel.json`) for the one scheduled job — a single
+  follow-up reminder to a client who hasn't answered.
 - **Vitest** for unit tests, plus a small scenario harness
   (`npm run scenarios`) that exercises the core business logic end to end
   against a deterministic mock of Claude.
@@ -65,6 +71,7 @@ refuses to boot if one is missing, naming exactly which):
 | `DATABASE_URL` | Supabase project → Settings → Database → Connection string → **URI**, port **6543** (the transaction pooler). Percent-encode the password if it contains `@ % # / : ?` — a password copied straight off the dashboard usually needs this. |
 | `APP_URL` | `http://localhost:3000` locally |
 | `GMAIL_USER`, `GMAIL_APP_PASSWORD` | Optional. A Gmail address with an [App Password](https://myaccount.google.com/apppasswords) (requires 2-Step Verification on). Without these, the app's own emails are skipped (and logged as such) rather than failing — the client share link and PDF download still work either way. |
+| `CRON_SECRET` | Optional. The bearer token guarding the scheduled follow-up job. Without it that endpoint refuses to run rather than running unsecured. Any long random string (`openssl rand -base64 32`); set the same value in the Vercel project so Vercel Cron can present it. |
 | `MOCK_ANTHROPIC` | `1` to run against a deterministic stand-in for Claude instead of the real API (no cost, no network) |
 
 ## Database setup
@@ -84,6 +91,10 @@ Run these against a Supabase project, in order, in the SQL Editor:
    activate those people and assign their capabilities.
 5. `sql/04-verify.sql` — asserts the schema matches what the code expects
    and prints `All checks passed.` if it does.
+
+`sql/05-client-decision.sql` and `sql/06-client-nudge.sql` are migrations for
+a database that was set up before those features existed. A fresh project
+does not need them — `01-schema.sql` already contains everything they add.
 
 `sql/00-drop-everything.sql` is a destructive full reset, kept separate and
 clearly labelled, for wiping a test database clean to start over from `01`.
@@ -106,6 +117,10 @@ can be exercised without an Anthropic key or any API cost.
 app/                    Next.js App Router — pages and API routes
   api/proposals/        every backend route: create, generate, edit,
                          regenerate, submit, approve, send, delete
+  api/share/[token]/     the client's own accept/decline — the only
+                         unauthenticated write in the app; the token is
+                         the credential
+  api/cron/nudge/        the scheduled follow-up, behind a bearer secret
   p/[id]/                the review/edit/approve/send workspace
   p/share/[token]/       the client-facing page and its live PDF render
   proposals/, queue/     "my proposals" list and the approval queue
@@ -157,7 +172,16 @@ test/                   unit tests, the mocked Claude scenario harness,
   into the append-only `events` table, which refuses any delete
   unconditionally (including one arriving via cascade) — so a proposal is
   hidden behind a `deleted_at` flag instead, keeping its full history
-  intact. A `sent` proposal can never be deleted at all, by anyone.
+  intact. Once a proposal has reached a client — `sent`, `accepted` or
+  `declined` — it can never be deleted at all, by anyone.
+- **The client's silence is a state the system can act on.** `status =
+  'sent'` means the proposal reached a client and they have not answered —
+  the accept/decline route is the only thing that moves it off that status.
+  A daily job (`/api/cron/nudge`) uses exactly that to send one reminder
+  after two days. It claims the nudge *before* sending, the opposite of the
+  send route's ordering: for a reminder, at-most-once is the safer failure.
+  A `nudges` row's primary key is what makes "only ever one" true, the same
+  way `deliveries` does for the proposal itself.
 - **Every external step logs itself before it's allowed to throw.** The
   `events` table is the whole answer to "what happened and why" — see
   `/p/:id/log` on any proposal.

@@ -635,6 +635,111 @@ export async function recordClientDecision(params: {
   return { ok: false, reason: 'This proposal is not awaiting a decision.' };
 }
 
+/* ── follow-up nudges ─────────────────────────────────────────────────────── */
+
+/**
+ * Every proposal that is overdue a reminder, oldest first.
+ *
+ * `status = 'sent'` is the whole definition of "the client hasn't answered":
+ * recordClientDecision() is the only writer that moves a proposal off it, so
+ * anything still sitting on 'sent' is unanswered by construction. The rest of
+ * the WHERE clause is about not sending a reminder that would embarrass us:
+ * a revoked or expired link points at a 404, a paused proposal is one the
+ * salesperson has already heard back on some other way, and the `not exists`
+ * against the nudges primary key is what makes a second run a no-op.
+ *
+ * Deliberately not built on listProposals(): that one caps at 100 rows with
+ * no cursor, ordered by recency, which for a backlog scan would silently
+ * skip the oldest — precisely the proposals this is for.
+ */
+export async function listProposalsNeedingNudge(params: {
+  afterDays: number;
+  limit: number;
+}): Promise<ProposalRow[]> {
+  const rows = await sql`
+    select p.* from proposals p
+     where p.status = 'sent'
+       and p.deleted_at is null
+       and p.nudge_paused = false
+       and p.share_revoked = false
+       and p.sent_at < now() - make_interval(days => ${params.afterDays})
+       and (p.share_expires_at is null or p.share_expires_at > now())
+       and not exists (select 1 from nudges n where n.proposal_id = p.id)
+     order by p.sent_at asc
+     limit ${params.limit}
+  `;
+  return rows.map((r) => ProposalRow.parse(r));
+}
+
+/**
+ * Claims the one nudge a proposal ever gets. Same shape as recordDelivery():
+ * proposal_id is the PRIMARY KEY, so two cron runs racing each other means
+ * one duplicate-key error, not two emails.
+ *
+ * The cron route calls this BEFORE sending, which is the opposite of the
+ * send route's ordering. For a reminder, at-most-once is the safer failure:
+ * a crash between claim and send costs one client a nudge, where the other
+ * ordering could send the same client two.
+ */
+export async function recordNudge(params: {
+  proposalId: string;
+  toEmail: string;
+  providerId: string | null;
+}): Promise<{ alreadyNudged: boolean }> {
+  try {
+    await sql`
+      insert into nudges (proposal_id, to_email, provider_id)
+      values (${params.proposalId}, ${params.toEmail}, ${params.providerId})
+    `;
+    return { alreadyNudged: false };
+  } catch (err) {
+    if (err instanceof Error && /duplicate key|unique constraint/i.test(err.message)) {
+      return { alreadyNudged: true };
+    }
+    throw err;
+  }
+}
+
+/**
+ * Backfills the provider's message id onto a nudge that has already been
+ * claimed. Needed because the claim happens BEFORE the send — so the row is
+ * written when the id doesn't exist yet, and without this the column would
+ * be permanently null and therefore a lie. Best-effort: the nudge is already
+ * recorded and the event log carries the id too.
+ */
+export async function attachNudgeProviderId(proposalId: string, providerId: string): Promise<void> {
+  await sql`update nudges set provider_id = ${providerId} where proposal_id = ${proposalId}`;
+}
+
+/** The nudge that was actually sent, for the sent panel to report. */
+export async function getNudge(proposalId: string): Promise<{ sent_at: Date; to_email: string } | null> {
+  const rows = await sql`
+    select to_email, sent_at from nudges where proposal_id = ${proposalId}
+  `;
+  if (!rows[0]) return null;
+  return { to_email: String(rows[0].to_email), sent_at: new Date(rows[0].sent_at) };
+}
+
+/**
+ * The salesperson's "I've already heard from them" switch. Unlike revoking a
+ * link this is reversible, so it takes the desired state rather than being
+ * one-way — the guard is only that the proposal exists and is still live.
+ */
+export async function setNudgePaused(
+  proposalId: string,
+  paused: boolean,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const rows = await sql`
+    update proposals
+       set nudge_paused = ${paused}
+     where id = ${proposalId}
+       and deleted_at is null
+     returning id
+  `;
+  if (rows[0]) return { ok: true };
+  return { ok: false, reason: 'Proposal not found.' };
+}
+
 /* ── supporting materials ─────────────────────────────────────────────────── */
 export async function insertMaterial(params: {
   proposalId: string;

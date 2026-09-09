@@ -127,3 +127,32 @@ export async function sendClientDecision(params: {
       `(This link requires you to be signed in.)`,
   );
 }
+
+/**
+ * The one reminder a client gets, two days after the proposal reached them.
+ *
+ * Written to give them an easy way out as well as an easy yes. A reminder
+ * that only pushes reads as pressure and earns silence; naming "not right
+ * now" as an acceptable answer is what makes it a nudge rather than a chase.
+ */
+export async function sendClientNudge(params: {
+  toEmail: string;
+  clientName: string;
+  companyName: string;
+  salespersonName: string;
+  proposalLink: string;
+}): Promise<EmailOutcome> {
+  return send(
+    params.toEmail,
+    `Following up — proposal for ${params.companyName}`,
+    `Hi ${params.clientName},\n\n` +
+      `Just following up on the proposal we sent over for ${params.companyName}. ` +
+      `I wanted to make sure it reached you.\n\n` +
+      `You can still view it here: ${params.proposalLink}\n\n` +
+      `There is an accept or decline button at the bottom of that page, so letting us ` +
+      `know either way only takes a moment. If the timing is not right, just say so — ` +
+      `that is a genuinely useful answer and we would rather know than wonder.\n\n` +
+      `And if anything in it needs changing, tell me what and we will revise it.\n\n` +
+      `Best regards,\n\n${params.salespersonName}\n\nKoya Talent`,
+  );
+}

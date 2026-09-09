@@ -30,6 +30,11 @@ const Schema = z.object({
   MAIL_FROM_NAME: z.string().default('Koya Talent'),
   DEFAULT_APPROVER_EMAIL: z.string().email().optional().or(z.literal('')),
 
+  // Optional, but the follow-up nudge job refuses to run without it rather
+  // than running unsecured — an endpoint that emails clients on a GET is not
+  // something to leave open. Vercel Cron sends it as `Authorization: Bearer`.
+  CRON_SECRET: z.string().min(16, 'use something long enough to be worth guessing at').optional(),
+
   MOCK_ANTHROPIC: z.enum(['0', '1']).default('0'),
 });
 
@@ -55,3 +60,6 @@ export const emailEnabled = Boolean(env.GMAIL_USER && env.GMAIL_APP_PASSWORD);
 
 /** True when Claude calls should be served from recorded fixtures. */
 export const mockClaude = env.MOCK_ANTHROPIC === '1';
+
+/** True when the scheduled follow-up job is allowed to run at all. */
+export const cronEnabled = Boolean(env.CRON_SECRET);

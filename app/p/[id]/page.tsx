@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { requireUser, AuthError, canViewProposal, canEditProposal, canEditSectionContent } from '@/lib/auth';
-import { getProposal, getSections, getMaterials } from '@/lib/queries';
+import { getProposal, getSections, getMaterials, getNudge } from '@/lib/queries';
 import ProposalEditor from './ProposalEditor';
 import NotAuthorized from '../../NotAuthorized';
 
@@ -38,7 +38,13 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
   // not click blind from a summary line.
   const canApprove = user.is_approver || user.is_admin;
 
-  const [sections, materials] = await Promise.all([getSections(id), getMaterials(id)]);
+  // The nudge row only ever exists for a sent proposal, so it isn't worth a
+  // round trip on the other statuses.
+  const [sections, materials, nudge] = await Promise.all([
+    getSections(id),
+    getMaterials(id),
+    proposal.status === 'sent' ? getNudge(id) : Promise.resolve(null),
+  ]);
 
   // Client Components need JSON-serialisable props — Date objects survive
   // the RSC boundary in some React versions but not reliably across all of
@@ -49,6 +55,7 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
         proposal={{
           ...proposal,
           date_of_call: proposal.date_of_call?.toISOString().slice(0, 10) ?? null,
+          sent_at: proposal.sent_at?.toISOString() ?? null,
           client_decision_at: proposal.client_decision_at?.toISOString() ?? null,
         }}
         sections={sections.map((s) => ({
@@ -57,6 +64,7 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
           edited_at: s.edited_at?.toISOString() ?? null,
         }))}
         materials={materials.map((m) => ({ ...m, created_at: m.created_at.toISOString() }))}
+        nudge={nudge ? { sent_at: nudge.sent_at.toISOString() } : null}
         canEdit={canEdit}
         canEditContent={canEditContent}
         canApprove={canApprove}

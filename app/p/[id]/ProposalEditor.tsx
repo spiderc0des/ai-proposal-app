@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { SectionRow } from '@/lib/db-schemas';
+import { daysUntilNudge } from '@/lib/permissions';
 import StatusPill from '../../StatusPill';
 import MarkdownBody from '../../MarkdownBody';
 
@@ -18,6 +19,8 @@ type SerializedProposal = {
   rejected_reason: string | null;
   share_token: string | null;
   share_revoked: boolean;
+  sent_at: string | null;
+  nudge_paused: boolean;
   client_decision_at: string | null;
   client_decision_by: string | null;
   client_decline_reason: string | null;
@@ -44,6 +47,7 @@ export default function ProposalEditor({
   proposal,
   sections: initialSections,
   materials,
+  nudge,
   canEdit,
   canEditContent,
   canApprove,
@@ -51,6 +55,10 @@ export default function ProposalEditor({
   proposal: SerializedProposal;
   sections: SerializedSection[];
   materials: SerializedMaterial[];
+  /** The follow-up reminder, if one has already gone out. Read from the
+   *  nudges table rather than inferred from a date, because that table is
+   *  the only record of what was actually sent. */
+  nudge: { sent_at: string } | null;
   /** False for an approver/admin reviewing someone else's proposal — they
    *  can read everything below, but every mutating control is hidden. The
    *  API routes enforce this too; this only keeps the UI from offering a
@@ -81,6 +89,7 @@ export default function ProposalEditor({
   const [shareRevoked, setShareRevoked] = useState(proposal.share_revoked);
   // Whether the inline "really revoke this?" confirmation is showing.
   const [revokingShare, setRevokingShare] = useState(false);
+  const [nudgePaused, setNudgePaused] = useState(proposal.nudge_paused);
   // Only set right after a send THIS session — email delivery detail isn't
   // persisted for display on a later page load, only in the event log.
   const [sendEmailInfo, setSendEmailInfo] = useState<{ sent: boolean; skipped?: boolean; reason?: string } | null>(
@@ -273,6 +282,22 @@ export default function ProposalEditor({
       await api(`/api/proposals/${proposal.id}/revoke-share`, { method: 'POST' });
       setShareRevoked(true);
       setRevokingShare(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleNudgePause(paused: boolean) {
+    setBusy('nudge-pause');
+    setError('');
+    try {
+      await api(`/api/proposals/${proposal.id}/nudge-pause`, {
+        method: 'POST',
+        body: JSON.stringify({ paused }),
+      });
+      setNudgePaused(paused);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -557,6 +582,45 @@ export default function ProposalEditor({
           )}
           {sendEmailInfo && !sendEmailInfo.sent && !sendEmailInfo.skipped && (
             <p className="text-[var(--red)] mt-2">Client email failed: {sendEmailInfo.reason}</p>
+          )}
+
+          {!shareRevoked && (
+            <div className="mt-3 pt-3 border-t border-[var(--rule)]">
+              {nudge ? (
+                <p className="text-[var(--ink-soft)]">
+                  Follow-up reminder sent on {new Date(nudge.sent_at).toLocaleDateString()}. Only
+                  one is ever sent.
+                </p>
+              ) : nudgePaused ? (
+                <p className="text-[var(--ink-soft)]">
+                  Follow-ups paused — the client won&apos;t be reminded about this one.
+                </p>
+              ) : proposal.sent_at ? (
+                <p className="text-[var(--ink-soft)]">
+                  {daysUntilNudge(new Date(proposal.sent_at)) === 0
+                    ? 'Follow-up reminder due — it will go out on the next scheduled run.'
+                    : `Follow-up reminder in ${daysUntilNudge(new Date(proposal.sent_at))} day${
+                        daysUntilNudge(new Date(proposal.sent_at)) === 1 ? '' : 's'
+                      }, unless the client answers first.`}
+                </p>
+              ) : null}
+
+              {/* Only worth offering while a reminder is still pending —
+                  once one has been sent there is nothing left to pause. */}
+              {canEdit && !nudge && (
+                <button
+                  onClick={() => handleNudgePause(!nudgePaused)}
+                  disabled={busy !== null}
+                  className="btn-link text-xs mt-1"
+                >
+                  {busy === 'nudge-pause'
+                    ? 'Saving…'
+                    : nudgePaused
+                      ? 'Resume follow-ups'
+                      : 'Pause follow-ups (already heard back another way)'}
+                </button>
+              )}
+            </div>
           )}
 
           {!shareRevoked && canEdit && (

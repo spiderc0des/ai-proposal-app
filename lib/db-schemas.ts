@@ -53,6 +53,8 @@ export const ProposalRow = z.object({
   client_decision_at: z.coerce.date().nullable(),
   client_decision_by: z.string().nullable(),
   client_decline_reason: z.string().nullable(),
+
+  nudge_paused: z.boolean(),
 });
 export type ProposalRow = z.infer<typeof ProposalRow>;
 

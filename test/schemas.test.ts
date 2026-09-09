@@ -49,6 +49,7 @@ function fakeProposalRow(overrides: Partial<ProposalRow> = {}): ProposalRow {
     client_decision_at: null,
     client_decision_by: null,
     client_decline_reason: null,
+    nudge_paused: false,
     ...overrides,
   };
 }

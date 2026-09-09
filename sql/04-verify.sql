@@ -29,7 +29,8 @@ declare
     array['proposals', 'share_revoked'], array['proposals', 'pdf_path'], array['proposals', 'sent_at'],
     array['proposals', 'deleted_at'],
     array['proposals', 'client_decision_at'], array['proposals', 'client_decision_by'],
-    array['proposals', 'client_decline_reason'],
+    array['proposals', 'client_decline_reason'], array['proposals', 'nudge_paused'],
+    array['nudges', 'proposal_id'], array['nudges', 'to_email'], array['nudges', 'sent_at'],
     array['proposal_sections', 'proposal_id'], array['proposal_sections', 'section_key'],
     array['proposal_sections', 'order_index'], array['proposal_sections', 'title'],
     array['proposal_sections', 'body_md'], array['proposal_sections', 'status'],
@@ -112,13 +113,23 @@ do $$ begin
   end if;
 end $$;
 
+-- ── nudges.proposal_id is the PRIMARY KEY, for the same reason ─────────────
+do $$ begin
+  if not exists (
+    select 1 from information_schema.table_constraints
+    where table_name = 'nudges' and constraint_type = 'PRIMARY KEY'
+  ) then
+    raise exception 'nudges has no primary key — a client could be nudged twice';
+  end if;
+end $$;
+
 -- ── RLS is on everywhere, with no policies (service-role-only access) ──────
 do $$
 declare
   tbl text;
   bad text[] := '{}';
 begin
-  foreach tbl in array array['proposals','proposal_sections','supporting_materials','events','deliveries','app_users']
+  foreach tbl in array array['proposals','proposal_sections','supporting_materials','events','deliveries','nudges','app_users']
   loop
     if not (select relrowsecurity from pg_class where relname = tbl) then
       bad := array_append(bad, tbl);

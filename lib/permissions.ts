@@ -98,3 +98,25 @@ const EDITABLE_CONTENT_STATUSES = new Set([
 export function canEditSectionContent(proposal: { status: string }): boolean {
   return EDITABLE_CONTENT_STATUSES.has(proposal.status);
 }
+
+/**
+ * How long a client gets to answer before the scheduled job sends one
+ * reminder. Lives here rather than in the cron route so the sent panel can
+ * tell the salesperson when the follow-up is due using the same number the
+ * job actually uses — a UI that promises "in 2 days" while the job waits 3
+ * is worse than saying nothing.
+ */
+export const NUDGE_AFTER_DAYS = 2;
+
+/**
+ * Whole days left before a sent proposal becomes eligible for its reminder,
+ * floored at 0 (0 means "due — the next run will pick it up").
+ *
+ * Deliberately approximate. Vercel Cron on the Hobby tier fires roughly
+ * once a day at an approximate time, so the real delay is 2–3 days; this
+ * counts down to eligibility, not to the moment an email lands.
+ */
+export function daysUntilNudge(sentAt: Date, now: Date = new Date()): number {
+  const dueAt = sentAt.getTime() + NUDGE_AFTER_DAYS * 24 * 60 * 60 * 1000;
+  return Math.max(0, Math.ceil((dueAt - now.getTime()) / (24 * 60 * 60 * 1000)));
+}

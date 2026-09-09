@@ -104,6 +104,11 @@ create table if not exists proposals (
   client_decision_by     text,
   client_decline_reason  text,
 
+  -- The salesperson's "stop chasing this one" switch, for when the client
+  -- responded somewhere the app cannot see — an email reply, a phone call.
+  -- Without it the follow-up job would nudge someone who already answered.
+  nudge_paused           boolean not null default false,
+
   -- soft delete: hidden from every listing once set, never a hard DELETE.
   -- A hard delete would cascade into `events` (on delete cascade, sql/02-
   -- triggers.sql), and events_are_immutable() unconditionally raises on
@@ -192,6 +197,24 @@ create table if not exists deliveries (
   sent_at      timestamptz not null default now()
 );
 
+-- ── nudges. Same shape and same reasoning as deliveries above: the primary
+--    key IS the "only ever nudged once" guarantee. A retried or concurrent
+--    cron run gets a duplicate-key error instead of sending a client a
+--    second reminder.
+--
+--    Deliberately a table rather than an `events` row. Events has no
+--    uniqueness constraint, so it could not enforce this at all, and the
+--    "has this been nudged?" scan would be `where step = '...'` with no
+--    proposal_id — there is no index on `step`, so that means sequentially
+--    scanning the busiest table in the app on every tick. Events still
+--    narrates what happened; this table is what makes it true. ─────────────
+create table if not exists nudges (
+  proposal_id  uuid primary key references proposals(id) on delete cascade,
+  to_email     text not null,
+  provider_id  text,
+  sent_at      timestamptz not null default now()
+);
+
 -- ── Row Level Security ─────────────────────────────────────────────────────
 -- On, with NO policies at all. Every legitimate query in this app runs from a
 -- backend route handler using the service role key, which bypasses RLS. So
@@ -203,3 +226,4 @@ alter table proposal_sections    enable row level security;
 alter table supporting_materials enable row level security;
 alter table events               enable row level security;
 alter table deliveries           enable row level security;
+alter table nudges               enable row level security;
