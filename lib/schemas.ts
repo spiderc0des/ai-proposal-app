@@ -130,3 +130,30 @@ export const ApproveSchema = z.object({
   reason: z.string().trim().max(1000).optional(),
   version: z.coerce.number().int().positive(),
 });
+
+/**
+ * The CLIENT's decision, posted from the share link — not the internal
+ * approver's (that's ApproveSchema above).
+ *
+ * A discriminated union rather than one object with an optional reason, so
+ * "a decline must say why" is structural: there is no shape of this type
+ * that declines without a reason, and the route needs no extra check. This
+ * is a request body, not a Claude structured output, so the no-`.refine()`
+ * constraint on the schemas above does not apply here.
+ *
+ * `name` is a record of who acted, not authentication — anyone holding the
+ * link can decide, which is equally true of reading the proposal at all.
+ */
+export const ClientDecisionSchema = z.discriminatedUnion('decision', [
+  z.object({
+    decision: z.literal('accept'),
+    name: z.string().trim().min(1, 'Please enter your name').max(200),
+  }),
+  z.object({
+    decision: z.literal('decline'),
+    name: z.string().trim().min(1, 'Please enter your name').max(200),
+    reason: z.string().trim().min(1, 'Please say briefly why').max(1000),
+  }),
+]);
+
+export type ClientDecision = z.infer<typeof ClientDecisionSchema>;

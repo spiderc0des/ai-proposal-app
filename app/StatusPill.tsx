@@ -8,6 +8,9 @@ const STYLES: Record<string, { bg: string; fg: string }> = {
   rejected: { bg: 'var(--red-bg)', fg: 'var(--red)' },
   sent: { bg: 'var(--green-bg)', fg: 'var(--green)' },
   send_failed: { bg: 'var(--red-bg)', fg: 'var(--red)' },
+  // The client's own answer — 'rejected' above is the internal approver's.
+  accepted: { bg: 'var(--green-bg)', fg: 'var(--green)' },
+  declined: { bg: 'var(--red-bg)', fg: 'var(--red)' },
 };
 
 /** Shared between the proposal detail page and the proposals list. */

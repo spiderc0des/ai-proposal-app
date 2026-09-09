@@ -146,4 +146,14 @@ describe('canEditSectionContent — a delivered document must not be silently re
   it('allows rejected — editing a section is how a rejection gets addressed, and resubmitted', () => {
     expect(canEditSectionContent({ status: 'rejected' })).toBe(true);
   });
+
+  // The client's own decision, as opposed to the internal approver's
+  // 'rejected' above. Both are terminal for editing, for different reasons.
+  it('blocks accepted — the client agreed to this exact text; it is a live agreement', () => {
+    expect(canEditSectionContent({ status: 'accepted' })).toBe(false);
+  });
+
+  it('blocks declined — editing it is the revise-and-resend flow, which does not exist yet', () => {
+    expect(canEditSectionContent({ status: 'declined' })).toBe(false);
+  });
 });

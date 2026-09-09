@@ -98,3 +98,32 @@ export async function sendApprovalRequest(params: {
       `(This link requires you to be signed in as an approver.)`,
   );
 }
+
+/**
+ * Tells the salesperson their client actually answered — the one thing the
+ * system could never report before, because nothing a client did was ever
+ * recorded. Best-effort: the decision is already committed by the time this
+ * is called, so a failure here must never undo it.
+ */
+export async function sendClientDecision(params: {
+  toEmail: string;
+  decision: 'accept' | 'decline';
+  clientName: string;
+  companyName: string;
+  reason?: string;
+  proposalLink: string;
+}): Promise<EmailOutcome> {
+  const accepted = params.decision === 'accept';
+  return send(
+    params.toEmail,
+    accepted
+      ? `Accepted — ${params.companyName}`
+      : `Declined — ${params.companyName}`,
+    (accepted
+      ? `${params.clientName} accepted the proposal for ${params.companyName}.\n\n`
+      : `${params.clientName} declined the proposal for ${params.companyName}.\n\n` +
+        `Reason given:\n${params.reason ?? '(none given)'}\n\n`) +
+      `See it here: ${params.proposalLink}\n\n` +
+      `(This link requires you to be signed in.)`,
+  );
+}

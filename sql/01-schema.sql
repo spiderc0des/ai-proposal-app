@@ -14,9 +14,11 @@ do $$ begin
     'in_review',         -- a draft exists, salesperson is editing
     'pending_approval',
     'approved',
-    'rejected',
+    'rejected',          -- the internal approver said no. NOT the client.
     'sent',
-    'send_failed'
+    'send_failed',
+    'accepted',          -- the CLIENT accepted it, from the share link
+    'declined'           -- the CLIENT said no, with a reason
   );
 exception when duplicate_object then null; end $$;
 
@@ -91,6 +93,16 @@ create table if not exists proposals (
   share_revoked          boolean not null default false,
   pdf_path               text,
   sent_at                timestamptz,
+
+  -- the client's own decision, made from the share link. Kept separate from
+  -- the approval block above: `rejected_reason` is the internal approver's,
+  -- this is the client's, and one proposal can legitimately carry both in
+  -- its history. Collapsing them would make the audit trail lie about who
+  -- said no. `client_decision_by` is the name the client typed — a record of
+  -- who acted, not authentication: anyone holding the link can decide.
+  client_decision_at     timestamptz,
+  client_decision_by     text,
+  client_decline_reason  text,
 
   -- soft delete: hidden from every listing once set, never a hard DELETE.
   -- A hard delete would cascade into `events` (on delete cascade, sql/02-

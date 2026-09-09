@@ -46,7 +46,11 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
   return (
     <div className="max-w-3xl mx-auto">
       <ProposalEditor
-        proposal={{ ...proposal, date_of_call: proposal.date_of_call?.toISOString().slice(0, 10) ?? null }}
+        proposal={{
+          ...proposal,
+          date_of_call: proposal.date_of_call?.toISOString().slice(0, 10) ?? null,
+          client_decision_at: proposal.client_decision_at?.toISOString() ?? null,
+        }}
         sections={sections.map((s) => ({
           ...s,
           generated_at: s.generated_at?.toISOString() ?? null,

@@ -14,6 +14,9 @@ export const ProposalRow = z.object({
   status: z.enum([
     'draft', 'blocked', 'generating', 'in_review',
     'pending_approval', 'approved', 'rejected', 'sent', 'send_failed',
+    // The client's own decision — distinct from 'rejected', which is the
+    // internal approver's.
+    'accepted', 'declined',
   ]),
   version: z.number(),
 
@@ -46,6 +49,10 @@ export const ProposalRow = z.object({
   pdf_path: z.string().nullable(),
   sent_at: z.coerce.date().nullable(),
   deleted_at: z.coerce.date().nullable(),
+
+  client_decision_at: z.coerce.date().nullable(),
+  client_decision_by: z.string().nullable(),
+  client_decline_reason: z.string().nullable(),
 });
 export type ProposalRow = z.infer<typeof ProposalRow>;
 

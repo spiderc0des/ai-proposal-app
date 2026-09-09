@@ -46,6 +46,9 @@ function fakeProposalRow(overrides: Partial<ProposalRow> = {}): ProposalRow {
     pdf_path: null,
     sent_at: null,
     deleted_at: null,
+    client_decision_at: null,
+    client_decision_by: null,
+    client_decline_reason: null,
     ...overrides,
   };
 }

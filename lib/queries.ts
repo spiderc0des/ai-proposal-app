@@ -124,6 +124,25 @@ export async function listProposals(filter: {
 }
 
 /**
+ * How many proposals sit at each status, under the same visibility rule as
+ * listProposals. Drives the status filter on /proposals: it's what lets the
+ * page offer only the statuses that actually exist for this person, instead
+ * of eleven chips where most lead to an empty list.
+ */
+export async function countProposalsByStatus(
+  filter: { authorId?: string } = {},
+): Promise<Record<string, number>> {
+  const rows = await sql`
+    select status, count(*)::int as count
+      from proposals
+     where deleted_at is null
+       ${filter.authorId ? sql`and author_id = ${filter.authorId}` : sql``}
+     group by status
+  `;
+  return Object.fromEntries(rows.map((r) => [r.status as string, r.count as number]));
+}
+
+/**
  * Soft delete — sets `deleted_at`, never a real `DELETE`. A hard delete
  * would cascade into `events` (on delete cascade, sql/01-schema.sql), and
  * events_are_immutable() (sql/02-triggers.sql) unconditionally raises on
@@ -133,10 +152,15 @@ export async function listProposals(filter: {
  * trail survives a "delete," which fits the append-only design already in
  * place elsewhere.
  *
- * `status <> 'sent'` is enforced here, in the WHERE clause, not only by the
+ * The status guard is enforced here, in the WHERE clause, not only by the
  * route's own check above it — the same belt-and-braces pattern as every
- * other state transition in this file. A sent proposal is the delivered
- * record; it is never deletable, by anyone.
+ * other state transition in this file.
+ *
+ * Everything from `sent` onward is undeletable: the proposal reached a real
+ * client, and what happened next — nothing yet, accepted, or declined — is a
+ * fact about that engagement, not clutter. A declined proposal is arguably
+ * the most valuable of the three to keep, since it's the only record of why
+ * something was lost.
  */
 export async function deleteProposal(id: string): Promise<{ ok: true } | { ok: false; reason: string }> {
   const rows = await sql`
@@ -144,7 +168,7 @@ export async function deleteProposal(id: string): Promise<{ ok: true } | { ok: f
        set deleted_at = now()
      where id = ${id}
        and deleted_at is null
-       and status <> 'sent'
+       and status not in ('sent', 'accepted', 'declined')
      returning id
   `;
   if (rows[0]) return { ok: true };
@@ -152,7 +176,10 @@ export async function deleteProposal(id: string): Promise<{ ok: true } | { ok: f
   const current = await sql`select status, deleted_at from proposals where id = ${id}`;
   if (!current[0]) return { ok: false, reason: 'Proposal not found.' };
   if (current[0].deleted_at) return { ok: false, reason: 'Already deleted.' };
-  return { ok: false, reason: `Cannot delete a '${current[0].status}' proposal — sent proposals are the delivered record.` };
+  return {
+    ok: false,
+    reason: `Cannot delete a '${current[0].status}' proposal — once it has reached a client, it stays on the record.`,
+  };
 }
 
 export async function getSections(proposalId: string): Promise<SectionRow[]> {
@@ -554,6 +581,58 @@ export async function revokeShare(
   if (!current) return { ok: false, reason: 'Proposal not found.' };
   if (current.share_revoked) return { ok: false, reason: 'The client link is already revoked.' };
   return { ok: false, reason: 'This proposal has no client link to revoke — it has not been sent yet.' };
+}
+
+/**
+ * The client's own accept/decline, made from the share link.
+ *
+ * Keyed on the TOKEN, not the proposal id: the client never sees an id, and
+ * doing it this way makes the authority check and the write a single atomic
+ * statement — you cannot decide on a proposal whose token you do not hold,
+ * because holding it is the WHERE clause. The same four conditions
+ * getProposalByShareToken() enforces for reading are repeated here rather
+ * than checked separately, so a link that went stale between rendering the
+ * page and clicking the button cannot slip through.
+ *
+ * `status = 'sent'` is what makes a decision final: a second POST matches
+ * nothing, so no separate idempotency handling is needed anywhere above.
+ */
+export async function recordClientDecision(params: {
+  token: string;
+  decision: 'accept' | 'decline';
+  name: string;
+  reason?: string;
+}): Promise<{ ok: true; proposal: ProposalRow } | { ok: false; reason: string }> {
+  const rows = await sql`
+    update proposals
+       set status = ${params.decision === 'accept' ? 'accepted' : 'declined'},
+           client_decision_at = now(),
+           client_decision_by = ${params.name},
+           client_decline_reason = ${params.reason ?? null}
+     where share_token = ${params.token}
+       and status = 'sent'
+       and share_revoked = false
+       and deleted_at is null
+       and (share_expires_at is null or share_expires_at > now())
+     returning *
+  `;
+  if (rows[0]) return { ok: true, proposal: ProposalRow.parse(rows[0]) };
+
+  // Nothing matched — say which of the conditions failed. Deliberately does
+  // NOT reveal anything about a proposal the caller has no valid token for.
+  const [current] = await sql`
+    select status, share_revoked, deleted_at, share_expires_at
+      from proposals where share_token = ${params.token}
+  `;
+  if (!current || current.deleted_at) return { ok: false, reason: 'not_found' };
+  if (current.share_revoked) return { ok: false, reason: 'not_found' };
+  if (current.share_expires_at && new Date(current.share_expires_at) <= new Date()) {
+    return { ok: false, reason: 'not_found' };
+  }
+  if (current.status === 'accepted' || current.status === 'declined') {
+    return { ok: false, reason: 'This proposal has already been answered.' };
+  }
+  return { ok: false, reason: 'This proposal is not awaiting a decision.' };
 }
 
 /* ── supporting materials ─────────────────────────────────────────────────── */

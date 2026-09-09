@@ -18,6 +18,9 @@ type SerializedProposal = {
   rejected_reason: string | null;
   share_token: string | null;
   share_revoked: boolean;
+  client_decision_at: string | null;
+  client_decision_by: string | null;
+  client_decline_reason: string | null;
 };
 
 type SerializedSection = Omit<SectionRow, 'generated_at' | 'edited_at'> & {
@@ -484,6 +487,42 @@ export default function ProposalEditor({
           <button onClick={handleSend} disabled={busy !== null} className="btn btn-danger">
             {busy === 'send' ? 'Retrying…' : 'Retry send'}
           </button>
+        </div>
+      )}
+
+      {/* The client's own answer. Distinct from the 'rejected' panel above,
+          which is the internal approver's — both can appear in one
+          proposal's history and they mean different things. */}
+      {status === 'accepted' && (
+        <div className="panel panel-success">
+          <p className="font-semibold mb-1">
+            The client accepted this proposal
+            {proposal.client_decision_at
+              ? ` on ${new Date(proposal.client_decision_at).toLocaleDateString()}`
+              : ''}
+            .
+          </p>
+          {proposal.client_decision_by && <p>Confirmed by {proposal.client_decision_by}.</p>}
+        </div>
+      )}
+
+      {status === 'declined' && (
+        <div className="panel panel-danger">
+          <p className="font-semibold mb-1">
+            The client declined this proposal
+            {proposal.client_decision_at
+              ? ` on ${new Date(proposal.client_decision_at).toLocaleDateString()}`
+              : ''}
+            .
+          </p>
+          {proposal.client_decline_reason && (
+            <p className="mb-1">
+              Their reason: &ldquo;{proposal.client_decline_reason}&rdquo;
+            </p>
+          )}
+          {proposal.client_decision_by && (
+            <p className="text-[var(--ink-soft)]">Declined by {proposal.client_decision_by}.</p>
+          )}
         </div>
       )}
 

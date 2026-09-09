@@ -28,6 +28,8 @@ declare
     array['proposals', 'share_token'], array['proposals', 'share_expires_at'],
     array['proposals', 'share_revoked'], array['proposals', 'pdf_path'], array['proposals', 'sent_at'],
     array['proposals', 'deleted_at'],
+    array['proposals', 'client_decision_at'], array['proposals', 'client_decision_by'],
+    array['proposals', 'client_decline_reason'],
     array['proposal_sections', 'proposal_id'], array['proposal_sections', 'section_key'],
     array['proposal_sections', 'order_index'], array['proposal_sections', 'title'],
     array['proposal_sections', 'body_md'], array['proposal_sections', 'status'],
@@ -60,7 +62,7 @@ end $$;
 -- ── enum values match lib/db-schemas.ts ProposalRow.status exactly ─────────
 do $$
 declare
-  expected text[] := array['draft','blocked','generating','in_review','pending_approval','approved','rejected','sent','send_failed'];
+  expected text[] := array['draft','blocked','generating','in_review','pending_approval','approved','rejected','sent','send_failed','accepted','declined'];
   actual text[];
 begin
   select array_agg(enumlabel order by enumsortorder) into actual
