@@ -1,0 +1,13 @@
+{
+  "client_name": "Owen Betancourt",
+  "client_email": "owen@fernhill-clinics.com",
+  "company_name": "Fernhill Clinics",
+  "date_of_call": "2026-08-25",
+  "salesperson_name": "Marcus Webb",
+  "client_needs_summary": "Patients keep missing appointments because reminders are sent manually and inconsistently by front-desk staff.",
+  "project_scope": "An automated appointment reminder system that texts and emails patients ahead of their visit.",
+  "goals_and_objectives": "Reduce no-show rate, currently around 18%.",
+  "recommended_services": "Automated SMS and email reminders integrated with their existing booking calendar.",
+  "proposed_timeline": "",
+  "estimated_pricing": ""
+}

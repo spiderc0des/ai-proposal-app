@@ -1,0 +1,234 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Tokens. Light is the bare :root; dark redefines the same names under
+   prefers-color-scheme. Every color everywhere in the app is one of these
+   variables — nothing hard-codes a hex value outside this block, so the
+   whole app re-themes from here.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --paper: #fbfcfe;
+  --surface: #f1f5f9;
+  --surface-2: #e2e8f0;
+  --ink: #0f172a;
+  --ink-soft: #475569;
+  --ink-faint: #94a3b8;
+  --rule: #e2e8f0;
+  --rule-soft: #edf1f6;
+
+  /* Primary — sky blue */
+  --accent: #0284c7;
+  --accent-hover: #0369a1;
+  --accent-bg: #e0f2fe;
+  --accent-ring: rgba(2, 132, 199, 0.35);
+
+  /* Semantic — separate from the accent hue, meaning-bearing on their own */
+  --amber: #b45309;
+  --amber-bg: #fef3c7;
+  --red: #b91c1c;
+  --red-bg: #fee2e2;
+  --green: #15803d;
+  --green-bg: #dcfce7;
+
+  --radius: 0.6rem;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0a0f1a;
+    --surface: #111a2b;
+    --surface-2: #182338;
+    --ink: #e6edf5;
+    --ink-soft: #a8b6c8;
+    --ink-faint: #64748b;
+    --rule: #24304a;
+    --rule-soft: #1a2338;
+
+    --accent: #38bdf8;
+    --accent-hover: #7dd3fc;
+    --accent-bg: #0c2942;
+    --accent-ring: rgba(56, 189, 248, 0.35);
+
+    --amber: #fbbf24;
+    --amber-bg: #3a2a0d;
+    --red: #f87171;
+    --red-bg: #3a1414;
+    --green: #4ade80;
+    --green-bg: #0f2c1c;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.4);
+  }
+}
+
+* { border-color: var(--rule); }
+
+html {
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { text-wrap: balance; letter-spacing: -0.01em; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0.001ms !important; animation-duration: 0.001ms !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Shared component classes. Every page composes buttons, cards, badges and
+   inputs from these instead of repeating the same long Tailwind string —
+   change the look of "a button" once, here, rather than in eleven files.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: var(--radius);
+  padding: 0.55rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  transition: background-color 120ms ease, border-color 120ms ease, opacity 120ms ease, transform 80ms ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.btn-primary { background: var(--accent); color: white; box-shadow: var(--shadow-sm); }
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+
+.btn-success { background: var(--green); color: white; box-shadow: var(--shadow-sm); }
+.btn-success:hover:not(:disabled) { filter: brightness(1.08); }
+
+.btn-danger { background: var(--red); color: white; box-shadow: var(--shadow-sm); }
+.btn-danger:hover:not(:disabled) { filter: brightness(1.1); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--ink-soft);
+  border: 1px solid var(--rule);
+  padding: 0.5rem 0.9rem;
+}
+.btn-ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+
+.btn-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.btn-link:hover:not(:disabled) { color: var(--accent-hover); }
+
+.card {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem;
+}
+
+.card-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 80ms ease;
+}
+.card-link:hover { border-color: var(--accent); box-shadow: var(--shadow-sm); }
+.card-link:active { transform: translateY(1px); }
+
+.panel {
+  border-radius: var(--radius);
+  border-width: 1px;
+  border-left-width: 3px;
+  padding: 0.9rem 1.1rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+.panel-info    { background: var(--accent-bg); border-color: var(--accent); color: var(--ink); }
+.panel-warning { background: var(--amber-bg);  border-color: var(--amber); color: var(--ink); }
+.panel-danger  { background: var(--red-bg);    border-color: var(--red); color: var(--ink); }
+.panel-success { background: var(--green-bg);  border-color: var(--green); color: var(--ink); }
+
+.field {
+  width: 100%;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.75rem;
+  font-size: 0.875rem;
+  background: var(--paper);
+  color: var(--ink);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.field:hover { border-color: var(--ink-faint); }
+.field:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.field::placeholder { color: var(--ink-faint); }
+
+.label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.label-hint {
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  border: 1px solid var(--rule);
+}
+
+.divider { border-top: 1px solid var(--rule); }
+
+.markdown-body h2 { font-size: 1.2rem; font-weight: 700; margin: 1.4rem 0 0.55rem; color: var(--ink); }
+.markdown-body h3 { font-size: 1.02rem; font-weight: 600; margin: 1.1rem 0 0.4rem; color: var(--accent); }
+.markdown-body p { margin-bottom: 0.65rem; line-height: 1.6; color: var(--ink); }
+.markdown-body ul { list-style: disc; padding-left: 1.4rem; margin-bottom: 0.65rem; }
+.markdown-body li { margin-bottom: 0.3rem; line-height: 1.55; }

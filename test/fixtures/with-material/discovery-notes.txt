@@ -1,0 +1,24 @@
+Northbridge Logistics — discovery call notes
+Call date: 20 Aug 2026
+Attendees: Priya Nandakumar (Ops Lead), Marcus Webb (Koya Talent)
+
+Current state
+- Dispatch runs out of a shared Google Sheet, edited by up to 4 people at once.
+- Roughly 40 dispatch events happen on a typical weekday.
+- Their fleet-tracking vendor (FleetPulse) exposes a GPS ping every 30 seconds
+  per vehicle via a REST API already in use by their existing ops tooling.
+- Double-booking (two dispatchers assigning the same driver) happens 3-4
+  times a week and is their single biggest complaint.
+
+What they explicitly ruled out
+- Replacing FleetPulse itself — they are contracted through 2027 and are
+  happy with the hardware.
+- A native mobile app for drivers on day one — they want web-only first and
+  will revisit mobile after the pilot.
+
+Depot detail
+- 6 depots total. The pilot should run at their Manchester depot first
+  (18 drivers), since it has the most consistent GPS coverage.
+
+Quote from Priya: "If a dispatcher could just see who's free and closest,
+this whole problem goes away."

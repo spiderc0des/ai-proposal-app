@@ -1,0 +1,13 @@
+{
+  "client_name": "Isabel Chen",
+  "client_email": "isabel@brightloop.io",
+  "company_name": "Brightloop",
+  "date_of_call": "2026-08-30",
+  "salesperson_name": "Marcus Webb",
+  "client_needs_summary": "Support tickets pile up over the weekend with no triage until Monday morning.",
+  "project_scope": "A triage bot that categorises incoming tickets by urgency and routes them to the right queue automatically.",
+  "goals_and_objectives": "Cut Monday-morning backlog and make sure urgent tickets are flagged within the hour, any day of the week.",
+  "recommended_services": "An AI triage layer in front of their existing helpdesk, plus a weekly accuracy report.",
+  "proposed_timeline": "6 weeks from kickoff.",
+  "estimated_pricing": ""
+}

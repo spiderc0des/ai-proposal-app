@@ -1,0 +1,13 @@
+{
+  "client_name": "Priya Nandakumar",
+  "client_email": "priya@northbridge-logistics.com",
+  "company_name": "Northbridge Logistics",
+  "date_of_call": "2026-08-20",
+  "salesperson_name": "Marcus Webb",
+  "client_needs_summary": "Their dispatch team is still tracking driver assignments in a shared spreadsheet, which breaks whenever two people edit it at once. They want a single system that shows live driver status and assigns jobs automatically based on proximity.",
+  "project_scope": "Build a dispatch dashboard that pulls driver GPS pings from their existing fleet-tracking API, shows live positions on a map, and lets a dispatcher assign or auto-assign a job to the nearest available driver.",
+  "goals_and_objectives": "Cut average dispatch time from 12 minutes to under 4 minutes, and eliminate the double-booking errors that currently happen 3-4 times a week.",
+  "recommended_services": "A dispatch web app with live map view, an auto-assignment engine, and a driver mobile view for accepting jobs.",
+  "proposed_timeline": "8 weeks: 2 weeks discovery and design, 4 weeks build, 2 weeks pilot with one depot before full rollout.",
+  "estimated_pricing": "$42,000 fixed fee, payable in three milestones of $14,000 each."
+}

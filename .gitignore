@@ -1,0 +1,19 @@
+node_modules/
+.next/
+out/
+build/
+.env
+.env.local
+.env*.local
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+.vercel
+coverage/
+test/.artifacts/
+
+# Working notes and the unmodified reference brief — not part of the app
+# itself. Keep these locally; see README.md for the setup steps that
+# would otherwise live in docs/BUILD-GUIDE.md.
+docs/
+aat-c3-week-3-proposal-app/
