@@ -527,12 +527,17 @@ export async function checkSendPreconditions(proposalId: string): Promise<
 export async function recordDelivery(params: {
   proposalId: string;
   toEmail: string;
+  /** Who carried it — see EMAIL_PROVIDER / NO_EMAIL_PROVIDER in lib/email.ts.
+   *  Required, and the column has no default, because the previous
+   *  arrangement (a default of 'resend' and no caller writing it) made every
+   *  row in this table wrong without anything failing. */
+  provider: string;
   providerId: string | null;
 }): Promise<{ alreadySent: boolean }> {
   try {
     await sql`
-      insert into deliveries (proposal_id, to_email, provider_id)
-      values (${params.proposalId}, ${params.toEmail}, ${params.providerId})
+      insert into deliveries (proposal_id, to_email, provider, provider_id)
+      values (${params.proposalId}, ${params.toEmail}, ${params.provider}, ${params.providerId})
     `;
     return { alreadySent: false };
   } catch (err) {

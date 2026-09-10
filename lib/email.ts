@@ -39,6 +39,17 @@ const transport = emailEnabled
 // authenticated account, with only the display name customisable.
 const FROM = emailEnabled ? `"${env.MAIL_FROM_NAME}" <${env.GMAIL_USER}>` : null;
 
+/**
+ * The name recorded against a delivery, so a stored provider_id can be
+ * interpreted later. Exported rather than written as a literal at the call
+ * site: the last time this changed (Resend to Gmail), a hard-coded value
+ * was missed and the deliveries table lied about every row for two days.
+ */
+export const EMAIL_PROVIDER = 'gmail';
+
+/** What to record when nothing was sent — the tokenised link WAS the delivery. */
+export const NO_EMAIL_PROVIDER = 'none';
+
 export type EmailOutcome =
   | { sent: true; providerId: string | null }
   | { sent: false; skipped: true; reason: string }

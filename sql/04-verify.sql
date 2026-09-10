@@ -40,7 +40,8 @@ declare
     array['supporting_materials', 'citations_json'],
     array['events', 'proposal_id'], array['events', 'actor'], array['events', 'step'],
     array['events', 'ok'], array['events', 'duration_ms'], array['events', 'detail'],
-    array['deliveries', 'proposal_id'], array['deliveries', 'to_email'], array['deliveries', 'provider_id'],
+    array['deliveries', 'proposal_id'], array['deliveries', 'to_email'],
+    array['deliveries', 'provider'], array['deliveries', 'provider_id'],
     array['app_users', 'id'], array['app_users', 'email'],
     array['app_users', 'is_sales'], array['app_users', 'is_approver'], array['app_users', 'is_admin']
   ];
@@ -110,6 +111,26 @@ do $$ begin
     where table_name = 'deliveries' and constraint_type = 'PRIMARY KEY'
   ) then
     raise exception 'deliveries has no primary key — a double-send would insert two rows instead of one';
+  end if;
+end $$;
+
+-- ── deliveries.provider has no default ────────────────────────────────────
+-- It had one ('resend'), recordDelivery() never wrote the column, and every
+-- row in the table was therefore wrong about which service sent it while
+-- nothing failed. A default on a column no caller writes is a silent lie;
+-- this asserts it stays gone, so an insert that forgets the column fails
+-- loudly instead of inventing an answer.
+do $$
+declare
+  d text;
+begin
+  select column_default into d from information_schema.columns
+   where table_name = 'deliveries' and column_name = 'provider';
+
+  if d is not null then
+    raise exception
+      'deliveries.provider has a default (%) — every row that skips the column will silently claim it. Run sql/07-delivery-provider.sql',
+      d;
   end if;
 end $$;
 

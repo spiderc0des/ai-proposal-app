@@ -4,7 +4,7 @@ import {
   checkSendPreconditions, getSections, recordDelivery, markSent, markSendFailed, getProposal,
 } from '@/lib/queries';
 import { renderProposalPdf } from '@/lib/pdf';
-import { sendClientProposal } from '@/lib/email';
+import { sendClientProposal, EMAIL_PROVIDER, NO_EMAIL_PROVIDER } from '@/lib/email';
 import { shareToken } from '@/lib/hash';
 import { sql } from '@/lib/db';
 import { env } from '@/lib/env';
@@ -104,9 +104,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       throw err;
     }
 
+    // A delivery row is written even when the email was SKIPPED, because the
+    // tokenised link and PDF already satisfy the brief's "exported or sent" —
+    // so the provider recorded here is whatever actually carried it, which in
+    // that case is nothing.
     const { alreadySent } = await recordDelivery({
       proposalId: id,
       toEmail: check.proposal.client_email,
+      provider: emailResult.sent ? EMAIL_PROVIDER : NO_EMAIL_PROVIDER,
       providerId: 'providerId' in emailResult ? emailResult.providerId : null,
     });
 

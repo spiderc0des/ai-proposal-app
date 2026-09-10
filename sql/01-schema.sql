@@ -192,7 +192,18 @@ create index if not exists events_failures_idx on events (at desc) where ok = fa
 create table if not exists deliveries (
   proposal_id  uuid primary key references proposals(id) on delete cascade,
   to_email     text not null,
-  provider     text not null default 'resend',
+  -- Which service actually carried it, and its own id for that message.
+  -- A provider_id is meaningless without this: a Gmail Message-ID and a
+  -- Resend id look nothing alike, and in a year the label is what makes an
+  -- old id traceable.
+  --
+  -- Deliberately NO default. It had one ('resend'), left over from before
+  -- the switch to Gmail SMTP, and recordDelivery() never wrote the column —
+  -- so every row in the table claimed 'resend' while carrying a Gmail
+  -- Message-ID, and stayed wrong for as long as nobody looked. A default on
+  -- a column nobody writes is not a convenience, it is a silent lie. With
+  -- none, an insert that forgets it fails loudly instead.
+  provider     text not null,
   provider_id  text,
   sent_at      timestamptz not null default now()
 );
