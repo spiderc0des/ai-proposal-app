@@ -1,6 +1,7 @@
 import 'server-only';
 import nodemailer from 'nodemailer';
 import { env, emailEnabled } from './env';
+import { emailShell, p as para, button, quote, escapeHtml } from './email-layout';
 
 /**
  * Three jobs, one provider:
@@ -43,7 +44,21 @@ export type EmailOutcome =
   | { sent: false; skipped: true; reason: string }
   | { sent: false; skipped: false; reason: string };
 
-async function send(to: string, subject: string, text: string): Promise<EmailOutcome> {
+/**
+ * Sends both parts, always.
+ *
+ * `text` is not a fallback nobody sees. It is what a screen reader reads, what
+ * a watch notification shows, what a plain-text client renders — and a message
+ * with no text part scores measurably worse with spam filters, which for a
+ * proposal going to a prospect is the failure that costs the most. So the
+ * signature makes it impossible to send HTML without also writing the text.
+ */
+async function send(
+  to: string,
+  subject: string,
+  text: string,
+  html: string,
+): Promise<EmailOutcome> {
   if (!transport || !FROM) {
     return {
       sent: false,
@@ -52,7 +67,7 @@ async function send(to: string, subject: string, text: string): Promise<EmailOut
     };
   }
   try {
-    const info = await transport.sendMail({ from: FROM, to, subject, text });
+    const info = await transport.sendMail({ from: FROM, to, subject, text, html });
     return { sent: true, providerId: info.messageId ?? null };
   } catch (err) {
     return { sent: false, skipped: false, reason: err instanceof Error ? err.message : String(err) };
@@ -66,8 +81,13 @@ export async function sendClientProposal(params: {
   salespersonName: string;
   proposalLink: string;
 }): Promise<EmailOutcome> {
-  // Body from the brief's assets/client-email-template.md, unchanged in
-  // structure — only the placeholders are filled.
+  // Wording from the brief's assets/client-email-template.md, unchanged in
+  // structure — only the placeholders are filled. The HTML part says the
+  // same thing; it is not a different letter.
+  const name = escapeHtml(params.clientName);
+  const company = escapeHtml(params.companyName);
+  const seller = escapeHtml(params.salespersonName);
+
   return send(
     params.clientEmail,
     `Proposal for ${params.companyName}`,
@@ -80,6 +100,25 @@ export async function sendClientProposal(params: {
       `We are happy to iterate with you.\n\n` +
       `Looking forward to hearing your thoughts.\n\n` +
       `Best regards,\n\n${params.salespersonName}\n\nKoya Talent`,
+    emailShell({
+      title: `Your proposal from Koya Talent`,
+      preheader: `The proposal for ${params.companyName} — scope, timeline and pricing.`,
+      body:
+        para(`Hi ${name},`) +
+        para(
+          'Thanks again for taking the time to speak with us. Based on our conversation, ' +
+            'we have put together a customized proposal for your review.',
+        ) +
+        button({ label: 'View your proposal', href: params.proposalLink }) +
+        para('It covers the project scope, timeline, pricing details, and our recommended approach.') +
+        para(
+          'If you have any questions or would like to make adjustments, feel free to reach out — ' +
+            'we are happy to iterate with you.',
+        ) +
+        para('Looking forward to hearing your thoughts.') +
+        para(`Best regards,<br><strong>${seller}</strong><br>Koya Talent`),
+      footnote: `This link is private to ${company}. It expires in 90 days and can be withdrawn at any time.`,
+    }),
   );
 }
 
@@ -89,6 +128,9 @@ export async function sendApprovalRequest(params: {
   companyName: string;
   reviewLink: string;
 }): Promise<EmailOutcome> {
+  const author = escapeHtml(params.authorName);
+  const company = escapeHtml(params.companyName);
+
   return send(
     params.approverEmail,
     `Proposal ready for review — ${params.companyName}`,
@@ -96,6 +138,21 @@ export async function sendApprovalRequest(params: {
       `before it can go to the client.\n\n` +
       `Review it here: ${params.reviewLink}\n\n` +
       `(This link requires you to be signed in as an approver.)`,
+    emailShell({
+      title: `Ready for review: ${params.companyName}`,
+      // Names the person and the company, because an approver's inbox may
+      // hold several of these and the subject line alone does not say who
+      // is waiting on them.
+      preheader: `${params.authorName} needs your sign-off before this reaches the client.`,
+      body:
+        para(
+          `<strong>${author}</strong> submitted a proposal for <strong>${company}</strong> ` +
+            'and it needs your review before it can go to the client.',
+        ) +
+        button({ label: 'Review the proposal', href: params.reviewLink }) +
+        para('Nothing is sent until you approve it.', true),
+      footnote: 'This link requires you to be signed in as an approver.',
+    }),
   );
 }
 
@@ -114,6 +171,9 @@ export async function sendClientDecision(params: {
   proposalLink: string;
 }): Promise<EmailOutcome> {
   const accepted = params.decision === 'accept';
+  const who = escapeHtml(params.clientName);
+  const company = escapeHtml(params.companyName);
+
   return send(
     params.toEmail,
     accepted
@@ -125,6 +185,23 @@ export async function sendClientDecision(params: {
         `Reason given:\n${params.reason ?? '(none given)'}\n\n`) +
       `See it here: ${params.proposalLink}\n\n` +
       `(This link requires you to be signed in.)`,
+    emailShell({
+      title: accepted ? `${params.companyName} accepted` : `${params.companyName} declined`,
+      // The whole answer, in the inbox list, without opening anything —
+      // this is the one email whose content is a single fact.
+      preheader: accepted
+        ? `${params.clientName} accepted the proposal.`
+        : `${params.clientName} declined. Their reason is inside.`,
+      body:
+        para(
+          accepted
+            ? `<strong>${who}</strong> accepted the proposal for <strong>${company}</strong>.`
+            : `<strong>${who}</strong> declined the proposal for <strong>${company}</strong>.`,
+        ) +
+        (accepted ? '' : quote('Reason given', params.reason ?? '(none given)')) +
+        button({ label: 'Open the proposal', href: params.proposalLink }),
+      footnote: 'This link requires you to be signed in.',
+    }),
   );
 }
 
@@ -142,6 +219,10 @@ export async function sendClientNudge(params: {
   salespersonName: string;
   proposalLink: string;
 }): Promise<EmailOutcome> {
+  const name = escapeHtml(params.clientName);
+  const company = escapeHtml(params.companyName);
+  const seller = escapeHtml(params.salespersonName);
+
   return send(
     params.toEmail,
     `Following up — proposal for ${params.companyName}`,
@@ -154,5 +235,26 @@ export async function sendClientNudge(params: {
       `that is a genuinely useful answer and we would rather know than wonder.\n\n` +
       `And if anything in it needs changing, tell me what and we will revise it.\n\n` +
       `Best regards,\n\n${params.salespersonName}\n\nKoya Talent`,
+    emailShell({
+      title: 'Just following up',
+      // Says "no pressure" before the mail is even opened, which is the
+      // whole point of a nudge that is meant to read as a nudge.
+      preheader: `Your proposal for ${params.companyName} is still open — either answer is welcome.`,
+      body:
+        para(`Hi ${name},`) +
+        para(
+          `Just following up on the proposal we sent over for <strong>${company}</strong>. ` +
+            'I wanted to make sure it reached you.',
+        ) +
+        button({ label: 'View the proposal', href: params.proposalLink }) +
+        para(
+          'There is an accept or decline button at the bottom of that page, so letting us know ' +
+            'either way only takes a moment. <strong>If the timing is not right, just say so</strong> — ' +
+            'that is a genuinely useful answer and we would rather know than wonder.',
+        ) +
+        para('And if anything in it needs changing, tell me what and we will revise it.') +
+        para(`Best regards,<br><strong>${seller}</strong><br>Koya Talent`),
+      footnote: 'This is the only reminder we will send about this proposal.',
+    }),
   );
 }

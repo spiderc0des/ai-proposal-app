@@ -642,6 +642,114 @@ export async function recordClientDecision(params: {
   return { ok: false, reason: 'This proposal is not awaiting a decision.' };
 }
 
+/* ── user administration ──────────────────────────────────────────────────── */
+
+/**
+ * Everyone the app knows about, pending first.
+ *
+ * Pending users are the point of the admin page: signing in creates an
+ * `app_users` row with `active = false` (ensurePendingAppUser, called from
+ * the auth callback), and until now the only way to activate one was to edit
+ * sql/03-seed-users.sql and run it by hand. So they sort to the top — a
+ * person waiting to be let in is the only row here that needs an action.
+ */
+export async function listAppUsers(): Promise<AppUserRow[]> {
+  const rows = await sql`
+    select * from app_users
+     order by active asc, created_at asc
+  `;
+  return rows.map((r) => AppUserRow.parse(r));
+}
+
+/** How many active admins there are. The lockout guard below is built on it. */
+export async function countActiveAdmins(): Promise<number> {
+  const [row] = await sql`
+    select count(*)::int as n from app_users where is_admin and active
+  `;
+  return Number(row.n);
+}
+
+/**
+ * Sets one person's capabilities and whether they are active, in one write.
+ *
+ * Three ways this could go wrong, and what stops each:
+ *
+ *   1. **Locking every admin out.** If this write would leave no active
+ *      admin, it is refused. There is no recovery path inside the app for
+ *      that state — you would be editing the database by hand — so it is
+ *      not something to allow and then apologise for. Checked in the same
+ *      statement as the write, not before it, so two admins demoting each
+ *      other at the same moment cannot both pass a check and then both
+ *      commit.
+ *   2. **An active person with no capability at all.** They could sign in
+ *      and do nothing anywhere, with no error explaining why. The database
+ *      already refuses it (app_users_active_needs_a_capability), so this
+ *      returns the reason rather than letting a check-constraint violation
+ *      surface as a 500.
+ *   3. **An admin demoting themselves by accident.** Allowed — an admin may
+ *      legitimately step down — but only while another active admin exists,
+ *      which is guard 1. The route adds a confirmation for the self case.
+ */
+export async function setUserAccess(params: {
+  userId: string;
+  isSales: boolean;
+  isApprover: boolean;
+  isAdmin: boolean;
+  active: boolean;
+}): Promise<{ ok: true; user: AppUserRow } | { ok: false; reason: string }> {
+  if (params.active && !params.isSales && !params.isApprover && !params.isAdmin) {
+    return {
+      ok: false,
+      reason:
+        'An active user needs at least one capability, or they can sign in and do nothing. ' +
+        'Give them a capability, or deactivate them instead.',
+    };
+  }
+
+  const rows = await sql`
+    update app_users
+       set is_sales = ${params.isSales},
+           is_approver = ${params.isApprover},
+           is_admin = ${params.isAdmin},
+           active = ${params.active}
+     where id = ${params.userId}
+       -- The lockout guard, evaluated against the table as it stands inside
+       -- this statement rather than in a check beforehand, so two admins
+       -- demoting each other at the same moment cannot both pass and both
+       -- commit.
+       --
+       -- The invariant is "an active admin still exists afterwards". Only
+       -- three things can satisfy it, and all three must be listed — the
+       -- middle one is easy to forget and its absence is a real bug: with
+       -- no active admin at all, EVERY update starts failing, including
+       -- activating an ordinary sales user who has nothing to do with
+       -- admin. Found exactly that way, against a database whose only user
+       -- was not an admin.
+       and (
+         -- this row is, or becomes, an active admin
+         (${params.isAdmin} and ${params.active})
+         -- or it was not an active admin, so this write removes nothing
+         or not (app_users.is_admin and app_users.active)
+         -- or somebody else is still an active admin
+         or exists (
+           select 1 from app_users other
+            where other.is_admin and other.active and other.id <> app_users.id
+         )
+       )
+     returning *
+  `;
+  if (rows[0]) return { ok: true, user: AppUserRow.parse(rows[0]) };
+
+  const [current] = await sql`select id from app_users where id = ${params.userId}`;
+  if (!current) return { ok: false, reason: 'That user no longer exists.' };
+  return {
+    ok: false,
+    reason:
+      'This is the only active admin left. Promote someone else to admin first — ' +
+      'with no active admin, nobody can reach this page to fix it.',
+  };
+}
+
 /* ── follow-up nudges ─────────────────────────────────────────────────────── */
 
 /**

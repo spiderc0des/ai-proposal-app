@@ -2,7 +2,7 @@
 import { useState } from 'react';
 
 /**
- * The three text nav links, collapsed behind a hamburger below the `md`
+ * The text nav links, collapsed behind a hamburger below the `md`
  * breakpoint — the same links stay a plain inline row at `md` and above
  * (see app/layout.tsx, `hidden md:flex`). The profile avatar is small
  * enough to stay visible at every width, so it isn't duplicated in here.
@@ -14,6 +14,8 @@ export default function MobileNav({ isAdmin }: { isAdmin: boolean }) {
     { href: '/new', label: 'New proposal' },
     { href: '/proposals', label: isAdmin ? 'All proposals' : 'My proposals' },
     { href: '/queue', label: 'Approval queue' },
+    // Same as the desktop nav: admin-only, and the page enforces it anyway.
+    ...(isAdmin ? [{ href: '/admin', label: 'People' }] : []),
   ];
 
   return (

@@ -45,6 +45,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <a href="/queue" className="px-3 py-1.5 rounded-md text-[var(--ink-soft)] hover:text-[var(--accent)] hover:bg-[var(--accent-bg)] transition-colors">
                   Approval queue
                 </a>
+                {/* Hidden for everyone else, and the page checks is_admin
+                    itself — this only avoids offering a link that would
+                    come straight back as a refusal. */}
+                {user?.is_admin && (
+                  <a href="/admin" className="px-3 py-1.5 rounded-md text-[var(--ink-soft)] hover:text-[var(--accent)] hover:bg-[var(--accent-bg)] transition-colors">
+                    People
+                  </a>
+                )}
               </nav>
               <MobileNav isAdmin={Boolean(user?.is_admin)} />
               <a
