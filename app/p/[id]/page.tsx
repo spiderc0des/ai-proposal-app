@@ -1,5 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
-import { requireUser, AuthError, canViewProposal, canEditProposal, canEditSectionContent } from '@/lib/auth';
+import { requireUser, AuthError, canViewProposal, canEditProposal } from '@/lib/auth';
 import { getProposal, getSections, getMaterials, getNudge } from '@/lib/queries';
 import ProposalEditor from './ProposalEditor';
 import NotAuthorized from '../../NotAuthorized';
@@ -28,11 +28,12 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
   if (!canViewProposal(user, proposal)) {
     return <NotAuthorized message="This proposal belongs to someone else." />;
   }
+  // Only the WHO half is decided here. The WHEN half (is this status one
+  // whose content may still change?) is derived inside ProposalEditor from
+  // its live status state — a value computed here would be frozen at the
+  // status this page happened to render with, which for a proposal that is
+  // about to be generated is `generating`, and wrong one second later.
   const canEdit = canEditProposal(user, proposal);
-  // Narrower than canEdit: canEdit is about WHO (author or admin);
-  // canEditSectionContent is about WHEN (not once it's been sent to the
-  // client). Both must hold for the Edit/Regenerate controls to show.
-  const canEditContent = canEdit && canEditSectionContent(proposal);
   // Approve/Reject live on this page, not on the queue's list row — an
   // approver should see the full generated content before signing off,
   // not click blind from a summary line.
@@ -66,7 +67,6 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
         materials={materials.map((m) => ({ ...m, created_at: m.created_at.toISOString() }))}
         nudge={nudge ? { sent_at: nudge.sent_at.toISOString() } : null}
         canEdit={canEdit}
-        canEditContent={canEditContent}
         canApprove={canApprove}
       />
     </div>

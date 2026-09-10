@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { SectionRow } from '@/lib/db-schemas';
-import { daysUntilNudge } from '@/lib/permissions';
+import { daysUntilNudge, canEditSectionContent } from '@/lib/permissions';
 import StatusPill from '../../StatusPill';
 import MarkdownBody from '../../MarkdownBody';
 import ProposalClose from '../../ProposalClose';
@@ -50,7 +50,6 @@ export default function ProposalEditor({
   materials,
   nudge,
   canEdit,
-  canEditContent,
   canApprove,
 }: {
   proposal: SerializedProposal;
@@ -67,13 +66,6 @@ export default function ProposalEditor({
    *  material upload — actions that only ever make sense pre-content or
    *  are already status-gated by their own render condition. */
   canEdit: boolean;
-  /** canEdit AND the proposal hasn't been sent yet. Gates Edit and
-   *  Regenerate specifically — narrower than canEdit, because a sent
-   *  proposal is a delivered document that must not be silently rewritten,
-   *  while `approved`/`pending_approval`/`send_failed` must STAY editable
-   *  so the database trigger that revokes a stale approval on edit
-   *  (sql/02-triggers.sql) can actually run. */
-  canEditContent: boolean;
   /** True for is_approver / is_admin. Approve/Reject live here, on the full
    *  proposal, not on the queue's list row — an approver should see what
    *  they're signing off on, not click blind from a summary line. */
@@ -100,6 +92,23 @@ export default function ProposalEditor({
   const [materialsList, setMaterialsList] = useState(materials);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
+
+  /**
+   * Whether the Edit and Regenerate controls should show — derived from the
+   * LIVE status, not passed in as a prop.
+   *
+   * It used to be a prop, and that was a real bug: a freshly created
+   * proposal is on `generating` when this page is server-rendered (see
+   * recordAudit in lib/queries.ts), so a prop computed there is `false`.
+   * Generating moves `status` to `in_review` in state, but a prop cannot
+   * follow — so the buttons stayed hidden until a manual refresh, which is
+   * exactly the moment a salesperson wants them. Deriving it here means it
+   * tracks every status change the component already knows about.
+   *
+   * `canEdit` (the WHO half — author or admin) stays a prop: it depends only
+   * on author_id and is_admin, neither of which this page can change.
+   */
+  const canEditContent = canEdit && canEditSectionContent({ status });
 
   const hasContent = sections.some((s) => s.body_md.trim().length > 0);
   // Gates the Resubmit button on a rejected proposal — compared against
