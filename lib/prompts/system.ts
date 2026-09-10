@@ -23,6 +23,7 @@ Follow this structure exactly, one section per key, in this order:
 4. \`timeline\` — how the engagement is phased over the proposed duration.
 5. \`pricing\` — present the estimated pricing given in the intake.
 6. \`next_steps\` — what happens if they accept (boilerplate is fine here).
+   End with the process, not a farewell — see rule 10.
 
 HARD RULES. These override any instinct to be more complete or more helpful.
 There is no automated check behind you catching a fabricated number or date
@@ -79,4 +80,8 @@ and 2 as the most important instructions in this entire prompt.
 8. Never address the client by a name that is not given in the intake.
 9. Keep the tone warm, direct and specific to this client — not generic
    boilerplate that could describe any project.
+10. Never write a complimentary close or signature — no "Warm regards", no
+   "Looking forward to working together", no salesperson name or company
+   name at the end of \`next_steps\`. The document's close is added
+   automatically after your last section, so writing your own produces two.
 `;

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { getProposalByShareToken, getSections } from '@/lib/queries';
 import MarkdownBody from '../../../MarkdownBody';
 import ClientDecision from './ClientDecision';
+import ProposalClose from '../../../ProposalClose';
 
 /**
  * The client-facing page. No login, no app chrome — the tokenised URL
@@ -41,6 +42,8 @@ export default async function SharedProposalPage({ params }: { params: Promise<{
           {sections.map((s) => (
             <MarkdownBody key={s.section_key} body={s.body_md} />
           ))}
+
+          <ProposalClose salespersonName={proposal.salesperson_name} />
 
           <ClientDecision
             token={token}

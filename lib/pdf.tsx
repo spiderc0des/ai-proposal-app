@@ -3,6 +3,7 @@ import { Document, Page, Text, View, StyleSheet, renderToBuffer } from '@react-p
 import { parseMarkdownSubset, type Block, type Run } from './markdown-subset';
 import type { Intake } from './schemas';
 import type { SectionRow } from './db-schemas';
+import { PROPOSAL_CLOSE } from './close';
 
 /**
  * The client-facing PDF. Pure JS rendering (@react-pdf/renderer) — no
@@ -36,6 +37,12 @@ const styles = StyleSheet.create({
   bullet: { width: 12 },
   liText: { flex: 1 },
   bold: { fontFamily: 'Helvetica-Bold' },
+  // The fixed close. `marginTop` rather than a divider — a letter's sign-off
+  // is separated by space, not by a rule.
+  closeBlock: { marginTop: 22 },
+  closeFarewell: { marginBottom: 12 },
+  closeName: { fontFamily: 'Helvetica-Bold', marginTop: 10 },
+  closeCompany: { color: '#46586b' },
   footer: {
     position: 'absolute', bottom: 32, left: 56, right: 56,
     fontSize: 8, color: '#9aa8b5', textAlign: 'center',
@@ -98,6 +105,16 @@ export function ProposalDocument({
         {sections.map((s) => (
           <RenderBlocks key={s.section_key} blocks={parseMarkdownSubset(s.body_md)} />
         ))}
+
+        {/* Rendered, never generated — see lib/close.ts. `wrap={false}` keeps
+            the whole sign-off on one page; a name orphaned onto a page of its
+            own is the one break a letter cannot survive. */}
+        <View style={styles.closeBlock} wrap={false}>
+          <Text style={styles.closeFarewell}>{PROPOSAL_CLOSE.farewell}</Text>
+          <Text>{PROPOSAL_CLOSE.signoff}</Text>
+          <Text style={styles.closeName}>{intake.salesperson_name}</Text>
+          <Text style={styles.closeCompany}>{PROPOSAL_CLOSE.company}</Text>
+        </View>
 
         <Text
           style={styles.footer}

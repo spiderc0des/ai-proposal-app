@@ -4,6 +4,7 @@ import type { SectionRow } from '@/lib/db-schemas';
 import { daysUntilNudge } from '@/lib/permissions';
 import StatusPill from '../../StatusPill';
 import MarkdownBody from '../../MarkdownBody';
+import ProposalClose from '../../ProposalClose';
 
 type SerializedProposal = {
   id: string;
@@ -401,6 +402,17 @@ export default function ProposalEditor({
               onSave={(body) => handleEdit(s.section_key, body)}
             />
           ))}
+
+          {/* Shown read-only so the salesperson sees the same ending the
+              client will. Without it the proposal appears to stop mid-letter
+              in review, and the natural fix — typing a sign-off into
+              next_steps by hand — would put two in the delivered document. */}
+          <div className="card">
+            <p className="label-hint mb-2">
+              Added automatically to the client&apos;s copy and the PDF — not editable
+            </p>
+            <ProposalClose salespersonName={proposal.salesperson_name} />
+          </div>
         </div>
       )}
 

@@ -189,10 +189,14 @@ function sectionFor(key: string, intake: Intake): Draft['sections'][number] {
       if (!intake.estimated_pricing) gaps.push('No pricing was provided — this section cannot state a figure.');
       break;
     case 'next_steps':
+      // No sign-off: the complimentary close is rendered by lib/close.ts, not
+      // written by the model. It used to be here, copied from the brief's
+      // template, which quietly made the mocked path end differently from the
+      // live one — every scenario passed while real proposals shipped with no
+      // close at all.
       body =
         `## Next Steps\n\nIf you are happy with this proposal, we will send over an agreement ` +
-        `to formalize the engagement and start the project. You can reach us with any questions.\n\n` +
-        `Warm regards,\n\n${intake.salesperson_name}\n\nKoya Talent`;
+        `to formalize the engagement and start the project. You can reach us with any questions.`;
       break;
   }
 
