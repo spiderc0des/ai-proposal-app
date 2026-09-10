@@ -38,7 +38,7 @@ intake  →  pre-flight audit  →  full draft  →  review & edit  →  submit
 - **Supabase Auth** magic links for identity, gated by an application-level
   allowlist (`app_users`) with three independent capability flags —
   `is_sales` / `is_approver` / `is_admin` — rather than one exclusive role.
-- **`@anthropic-ai/sdk`** on `claude-opus-5`, with adaptive thinking and
+- **`@anthropic-ai/sdk`** on `claude-sonnet-5`, with adaptive thinking and
   structured outputs (Zod schemas, via `zodOutputFormat`).
 - **Zod** — one schema per shape (intake, Claude's structured outputs, API
   request bodies), shared across the browser form, the API boundary, and
