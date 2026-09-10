@@ -307,7 +307,11 @@ export async function regenerateSectionRow(params: {
              error = null
        where proposal_id = ${params.proposalId} and section_key = ${params.sectionKey}
     `;
-    // bump the version so a concurrent editor is told about THIS change too
+    // Bump the version so a concurrent editor is told about THIS change too,
+    // and return what it actually became. The caller must not infer it by
+    // adding one: the sections_revoke_approval trigger may ALSO have bumped
+    // it during the section update above (it does, for approved /
+    // pending_approval / send_failed), making the real increment two.
     await tx`update proposals set version = version + 1 where id = ${params.proposalId}`;
   });
 }
@@ -345,10 +349,13 @@ export async function editSection(params: {
              edited_by = ${params.editedBy}
        where proposal_id = ${params.proposalId} and section_key = ${params.sectionKey}
     `;
-    // NB: if the proposal was 'approved' or 'pending_approval', the
-    // sections_revoke_approval trigger (sql/02-triggers.sql) fires here and
-    // resets status + bumps version again, automatically, on the database
-    // side — no route needs to remember this.
+    // NB: if the proposal was 'approved', 'pending_approval' or
+    // 'send_failed', the sections_revoke_approval trigger
+    // (sql/02-triggers.sql) has already fired during the update above and
+    // reset the status, bumping the version itself. So this is the SECOND
+    // increment in those cases and the first in every other — which is
+    // exactly why the new value is returned rather than left for the caller
+    // to guess by adding one.
     await tx`update proposals set version = version + 1 where id = ${params.proposalId}`;
   });
 }

@@ -96,7 +96,7 @@ export async function POST(
     // trigger may have just bounced status to in_review, and the UI needs
     // to see that without a page reload.
     const updated = await getProposal(id);
-    return NextResponse.json({ section: result.section, status: updated?.status });
+    return NextResponse.json({ section: result.section, status: updated?.status, version: updated?.version });
   } catch (err) {
     await markSectionFailed(id, key, err instanceof Error ? err.message : String(err)).catch(() => {});
     return errorResponse(err);

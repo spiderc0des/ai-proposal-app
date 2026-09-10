@@ -73,6 +73,25 @@ export default function ProposalEditor({
 }) {
   const [status, setStatus] = useState(proposal.status);
   const [version, setVersion] = useState(proposal.version);
+
+  /**
+   * Take the version the SERVER says the proposal is now on.
+   *
+   * Every handler below used to guess it — `setVersion(v => v + 1)` — and
+   * two of those guesses were wrong. Submit bumps the version server-side
+   * and the client did not update it at all, so the very next action failed
+   * the optimistic-lock check with "Someone else changed this proposal
+   * first" in a single session, one tab, nobody else involved. And an edit
+   * or regenerate on an approved / pending_approval / send_failed proposal
+   * bumps it TWICE, because the revoke-approval trigger fires as well, so
+   * +1 was short by one there too.
+   *
+   * Guessing was never going to hold: the client cannot know what the
+   * database triggers did. Every mutating route now returns the value.
+   */
+  function syncVersion(data: { version?: number }) {
+    if (typeof data.version === 'number') setVersion(data.version);
+  }
   const [rejectedReason, setRejectedReason] = useState(proposal.rejected_reason);
   // Whether the inline "why are you rejecting this" field is showing, and
   // its draft value — replaces a window.prompt() confirmation.
@@ -176,7 +195,7 @@ export default function ProposalEditor({
         body: JSON.stringify({ instruction: instruction.trim() || undefined, version }),
       });
       setSections((prev) => prev.map((s) => (s.section_key === sectionKey ? { ...s, ...data.section } : s)));
-      setVersion((v) => v + 1);
+      syncVersion(data);
       // The database trigger (revoke_approval_on_edit, sql/02-triggers.sql)
       // may have just bounced this proposal's status to in_review — e.g.
       // regenerating a section on an approved or rejected proposal. Without
@@ -199,7 +218,7 @@ export default function ProposalEditor({
         body: JSON.stringify({ body_md, version }),
       });
       setSections((prev) => prev.map((s) => (s.section_key === sectionKey ? { ...s, body_md, status: 'edited' } : s)));
-      setVersion((v) => v + 1);
+      syncVersion(data);
       // Same reasoning as handleRegenerate above.
       if (data.status) setStatus(data.status);
     } catch (err) {
@@ -218,6 +237,7 @@ export default function ProposalEditor({
         body: JSON.stringify({ version }),
       });
       setStatus(data.status);
+      syncVersion(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -234,7 +254,7 @@ export default function ProposalEditor({
         body: JSON.stringify({ decision: 'approve', version }),
       });
       setStatus(data.status);
-      setVersion((v) => v + 1);
+      syncVersion(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -251,7 +271,7 @@ export default function ProposalEditor({
         body: JSON.stringify({ decision: 'reject', reason, version }),
       });
       setStatus(data.status);
-      setVersion((v) => v + 1);
+      syncVersion(data);
       setRejectedReason(reason);
       setRejecting(false);
       setRejectReasonInput('');

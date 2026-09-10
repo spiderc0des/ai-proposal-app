@@ -64,7 +64,7 @@ export async function PATCH(
     // approved or rejected proposal. Returning the current status lets the
     // UI reflect that immediately, instead of only after a page reload.
     const updated = await getProposal(id);
-    return NextResponse.json({ ok: true, status: updated?.status });
+    return NextResponse.json({ ok: true, status: updated?.status, version: updated?.version });
   } catch (err) {
     return errorResponse(err);
   }

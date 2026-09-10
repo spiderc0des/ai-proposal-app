@@ -95,15 +95,29 @@ create trigger events_no_update before update or delete on events
 -- ── a proposal cannot be approved unless it is awaiting approval ───────────
 -- The route handler checks this too, in its WHERE clause. Belt and braces:
 -- this catches a direct database edit as well.
+--
+-- Both checks guard the TRANSITION into 'approved', not the state of being
+-- approved — hence `new.status is distinct from old.status` on each. Without
+-- it the first check fired on every subsequent update to an already-approved
+-- row, because such a row has new.status = 'approved' and old.status =
+-- 'approved', which is indeed not 'pending_approval'. The practical effect
+-- was that an approved proposal could never be soft-deleted: deleteProposal()
+-- permits it (only sent/accepted/declined are undeletable), but the UPDATE
+-- setting deleted_at was refused here, with an error about approving that had
+-- nothing to do with what the caller was trying to do.
 create or replace function guard_approval() returns trigger as $$
 begin
-  if new.status = 'approved' and old.status <> 'pending_approval' then
+  if new.status = 'approved'
+     and new.status is distinct from old.status
+     and old.status <> 'pending_approval' then
     raise exception
       'cannot approve from status %: a proposal must be pending_approval first',
       old.status;
   end if;
 
-  if new.status = 'approved' and new.approved_content_hash is null then
+  if new.status = 'approved'
+     and new.status is distinct from old.status
+     and new.approved_content_hash is null then
     raise exception
       'cannot approve without recording approved_content_hash';
   end if;

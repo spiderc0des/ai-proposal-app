@@ -29,7 +29,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }),
     );
 
-    return NextResponse.json({ status: proposal.status });
+    return NextResponse.json({ status: proposal.status, version: proposal.version });
   } catch (err) {
     return errorResponse(err);
   }

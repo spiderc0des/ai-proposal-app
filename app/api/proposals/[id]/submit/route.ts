@@ -46,7 +46,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // logged by withEventLog already; submission itself already succeeded
     });
 
-    return NextResponse.json({ status: proposal.status });
+    // The version is returned on every mutating route, and the client
+    // ASSIGNS it rather than incrementing its own copy. Submit is why: it
+    // bumps the version server-side, the client used to ignore that, and the
+    // very next action (Approve) then failed the optimistic-lock check with
+    // "Someone else changed this proposal first" — in one session, one tab,
+    // with nobody else involved.
+    return NextResponse.json({ status: proposal.status, version: proposal.version });
   } catch (err) {
     return errorResponse(err);
   }
