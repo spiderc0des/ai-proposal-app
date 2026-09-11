@@ -738,7 +738,15 @@ function SectionCard({
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold">{section.title}</h3>
         {canEdit && (
-          <button onClick={() => setEditing((e) => !e)} className="btn-link text-xs">
+          // Disabled only while THIS section is regenerating: its body is about
+          // to be replaced, so an edit started now would either be overwritten
+          // or save over the new text. Other sections stay editable.
+          <button
+            onClick={() => setEditing((e) => !e)}
+            disabled={isRegenerating}
+            title={isRegenerating ? 'Wait for this section to finish regenerating' : undefined}
+            className="btn-link text-xs disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+          >
             {editing ? 'Cancel' : 'Edit'}
           </button>
         )}

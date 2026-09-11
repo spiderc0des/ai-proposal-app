@@ -44,7 +44,6 @@ export default function NameForm({ initial }: { initial: string }) {
             setName(e.target.value);
             setSaved(false);
           }}
-          placeholder="e.g. Abdul Rahman"
           className="field"
           disabled={busy}
         />

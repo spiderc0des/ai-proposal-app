@@ -85,7 +85,6 @@ export default function InviteForm() {
               required
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              placeholder="Priya Raghunathan"
               className="field"
               disabled={busy}
             />
@@ -97,7 +96,6 @@ export default function InviteForm() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="priya@koyatalent.com"
               className="field"
               disabled={busy}
             />
