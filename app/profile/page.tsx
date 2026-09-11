@@ -1,7 +1,9 @@
 import { redirect } from 'next/navigation';
 import { currentUser, sessionEmail } from '@/lib/auth';
+import NameForm from './NameForm';
 
-export default async function ProfilePage() {
+export default async function ProfilePage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
+  const { welcome } = await searchParams;
   const [email, user] = await Promise.all([sessionEmail(), currentUser()]);
 
   // Profile makes no sense with no session at all — unlike other pages,
@@ -33,6 +35,19 @@ export default async function ProfilePage() {
           <p className="text-sm text-[var(--ink-faint)] truncate">{email}</p>
         </div>
       </div>
+
+      {/* Landing here from an invitation link (app/auth/confirm). */}
+      {welcome && !user && (
+        <div className="panel panel-success mb-4">
+          <p className="font-medium mb-1">Invitation accepted</p>
+          <p>
+            You&apos;re signed in. An admin now needs to activate your account — you&apos;ll
+            have access as soon as they do. There&apos;s nothing else you need to do.
+          </p>
+        </div>
+      )}
+
+      {user && <NameForm initial={user.full_name} />}
 
       {user ? (
         <div className="card mb-4">

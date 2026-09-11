@@ -43,7 +43,8 @@ declare
     array['deliveries', 'proposal_id'], array['deliveries', 'to_email'],
     array['deliveries', 'provider'], array['deliveries', 'provider_id'],
     array['app_users', 'id'], array['app_users', 'email'],
-    array['app_users', 'is_sales'], array['app_users', 'is_approver'], array['app_users', 'is_admin']
+    array['app_users', 'is_sales'], array['app_users', 'is_approver'], array['app_users', 'is_admin'],
+    array['app_users', 'invited_at'], array['app_users', 'invited_by'], array['app_users', 'first_signed_in_at']
   ];
   pair text[];
 begin

@@ -9,6 +9,9 @@ type Row = {
   is_approver: boolean;
   is_admin: boolean;
   active: boolean;
+  invited_at: string | null;
+  invited_by: string | null;
+  first_signed_in_at: string | null;
 };
 
 const CAPS = [
@@ -44,6 +47,7 @@ export default function UserAccessTable({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [resent, setResent] = useState<Record<string, string>>({});
 
   /** The row as it would be saved: stored values with any staged edits over them. */
   function pending(row: Row): Row {
@@ -111,6 +115,41 @@ export default function UserAccessTable({
     }
   }
 
+  /**
+   * Re-sends an invite that was never used. Sends the row's CURRENT stored
+   * values, so a resend cannot change anyone's capabilities by accident — and
+   * the server refuses to touch an active row regardless.
+   */
+  async function resend(row: Row) {
+    setBusy(row.id);
+    setErrors((prev) => ({ ...prev, [row.id]: '' }));
+    try {
+      const res = await fetch('/api/admin/invites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: row.email,
+          full_name: row.full_name || row.email,
+          is_sales: row.is_sales,
+          is_approver: row.is_approver,
+          is_admin: row.is_admin,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
+      setResent((prev) => ({
+        ...prev,
+        [row.id]: data.email?.sent
+          ? 'Invite re-sent.'
+          : `Email not sent (${data.email?.reason ?? 'unknown'}). Link: ${data.link}`,
+      }));
+    } catch (err) {
+      setErrors((prev) => ({ ...prev, [row.id]: err instanceof Error ? err.message : String(err) }));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   function reset(id: string) {
     setDraft((prev) => {
       const { [id]: _dropped, ...rest } = prev;
@@ -140,14 +179,42 @@ export default function UserAccessTable({
                 {row.full_name && (
                   <p className="text-xs text-[var(--ink-faint)] truncate">{row.email}</p>
                 )}
+                {row.invited_at && (
+                  <p className="text-xs text-[var(--ink-faint)] truncate">
+                    Invited {new Date(row.invited_at).toLocaleDateString()}
+                    {row.invited_by ? ` by ${row.invited_by}` : ''}
+                  </p>
+                )}
+                {!row.active && !row.first_signed_in_at && (
+                  <button
+                    type="button"
+                    onClick={() => resend(row)}
+                    disabled={busy !== null}
+                    className="btn-link text-xs mt-1"
+                  >
+                    {busy === row.id ? 'Sending…' : 'Resend invite'}
+                  </button>
+                )}
+                {resent[row.id] && (
+                  <p className="text-xs mt-1 break-all" style={{ color: 'var(--green)' }}>
+                    {resent[row.id]}
+                  </p>
+                )}
               </div>
               {row.active ? (
                 <span className="chip" style={{ color: 'var(--green)', background: 'var(--green-bg)' }}>
                   Active
                 </span>
-              ) : (
+              ) : row.first_signed_in_at ? (
+                // Clicked the link (or signed in on their own) — waiting on an admin.
                 <span className="chip" style={{ color: 'var(--amber)', background: 'var(--amber-bg)' }}>
-                  Pending — no access
+                  Signed in — awaiting activation
+                </span>
+              ) : (
+                // Invited, never clicked. Activating now would work, but the
+                // useful action is usually to chase or resend the invite.
+                <span className="chip" style={{ color: 'var(--ink-soft)', background: 'var(--surface-2)' }}>
+                  Invited — hasn&apos;t signed in yet
                 </span>
               )}
             </div>

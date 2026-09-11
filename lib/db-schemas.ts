@@ -115,5 +115,12 @@ export const AppUserRow = z.object({
   is_approver: z.boolean(),
   is_admin: z.boolean(),
   active: z.boolean(),
+  // .nullish(), not .nullable(): findAppUser() — which runs on every signed-in
+  // request — selects an explicit column list that omits these. A required
+  // key here would make that parse fail and lock every user out of the app.
+  // Only listAppUsers() (select *) reads them, for the admin page.
+  invited_at: z.coerce.date().nullish(),
+  invited_by: z.string().nullish(),
+  first_signed_in_at: z.coerce.date().nullish(),
 });
 export type AppUserRow = z.infer<typeof AppUserRow>;

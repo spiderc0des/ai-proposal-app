@@ -269,3 +269,54 @@ export async function sendClientNudge(params: {
     }),
   );
 }
+
+/**
+ * The invitation. The link signs the person in — so it is a credential, and
+ * it is never written to the events table or any log (see the invite route).
+ *
+ * States plainly that access needs an admin's activation after they click.
+ * Otherwise the first thing an invited person sees is "this account isn't
+ * on the approved list yet", which reads as the invite having failed.
+ */
+export async function sendInvite(params: {
+  toEmail: string;
+  fullName: string;
+  invitedBy: string;
+  link: string;
+}): Promise<EmailOutcome> {
+  const name = escapeHtml(params.fullName);
+  const by = escapeHtml(params.invitedBy);
+
+  return send(
+    params.toEmail,
+    `You're invited to the Koya Proposal Engine`,
+    `Hi ${params.fullName},\n\n` +
+      `${params.invitedBy} has invited you to the Koya Proposal Engine, where Koya Talent ` +
+      `drafts, reviews and sends client proposals.\n\n` +
+      `Accept your invitation: ${params.link}\n\n` +
+      `That link signs you in, so please don't forward it. It expires soon — if it ` +
+      `has, ask ${params.invitedBy} to send a new one.\n\n` +
+      `Once you've accepted, an admin will activate your account and you'll have access.\n\n` +
+      `Koya Talent`,
+    emailShell({
+      title: "You're invited",
+      preheader: `${params.invitedBy} invited you to the Koya Proposal Engine.`,
+      body:
+        para(`Hi ${name},`) +
+        para(
+          `<strong>${by}</strong> has invited you to the Koya Proposal Engine, where Koya Talent ` +
+            'drafts, reviews and sends client proposals.',
+        ) +
+        button({ label: 'Accept invitation', href: params.link }) +
+        para(
+          'Once you have accepted, an admin will activate your account and you will have access. ' +
+            'Until then, signing in will tell you your account is waiting for approval — ' +
+            'that is expected.',
+          true,
+        ),
+      footnote:
+        `This link signs you in, so please don't forward it. It expires soon — if it has, ` +
+        `ask ${by} to send a new one.`,
+    }),
+  );
+}

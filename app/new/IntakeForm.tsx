@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 const CONTACT_FIELDS: { key: string; label: string; type?: string; required?: boolean }[] = [
   { key: 'client_name', label: 'Client name', required: true },
@@ -19,9 +20,13 @@ const PROJECT_FIELDS: { key: string; label: string; hint?: string; long?: boolea
   { key: 'estimated_pricing', label: 'Estimated pricing' },
 ];
 
-export default function IntakeForm() {
+/** Fields the form shows but the server decides. Rendered disabled. */
+const LOCKED = new Set(['salesperson_name']);
+
+export default function IntakeForm({ salespersonName }: { salespersonName: string }) {
   const router = useRouter();
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<Record<string, string>>({ salesperson_name: salespersonName });
+  const hasName = salespersonName.trim().length > 0;
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [audit, setAudit] = useState<{
@@ -98,11 +103,24 @@ export default function IntakeForm() {
                 </span>
                 <input
                   type={f.type ?? 'text'}
-                  required={f.required}
+                  required={f.required && !LOCKED.has(f.key)}
                   value={field(f.key)}
                   onChange={(e) => setField(f.key, e.target.value)}
-                  className="field"
+                  disabled={LOCKED.has(f.key)}
+                  title={LOCKED.has(f.key) ? 'Set from your profile — this is the name clients see' : undefined}
+                  className="field disabled:opacity-70 disabled:cursor-not-allowed"
                 />
+                {LOCKED.has(f.key) && (
+                  <span className="label-hint">
+                    {hasName ? (
+                      <>From your <Link href="/profile" className="underline">profile</Link>.</>
+                    ) : (
+                      <span style={{ color: 'var(--amber)' }}>
+                        No name set — <Link href="/profile" className="underline">add yours</Link> first.
+                      </span>
+                    )}
+                  </span>
+                )}
               </label>
             ))}
           </div>
@@ -139,7 +157,15 @@ export default function IntakeForm() {
 
         {error && <p className="text-sm text-[var(--red)]">{error}</p>}
 
-        <button type="submit" disabled={submitting} className="btn btn-primary self-start">
+        {!hasName && (
+          <div className="panel panel-warning text-sm">
+            Add your name on your <Link href="/profile" className="underline font-medium">profile</Link>{' '}
+            before creating a proposal — it&apos;s what the client sees as &ldquo;Prepared by&rdquo;, and
+            without it every proposal would be signed with your email address.
+          </div>
+        )}
+
+        <button type="submit" disabled={submitting || !hasName} className="btn btn-primary self-start">
           {submitting ? 'Checking…' : 'Check readiness'}
         </button>
       </form>

@@ -16,7 +16,18 @@ export async function POST(request: NextRequest) {
   try {
     const user = await requireUser('sales');
     const body = await request.json();
-    const intake = IntakeSchema.parse(body);
+
+    // The salesperson is the signed-in user, full stop. Whatever the request
+    // body says for this field is discarded — the form renders it disabled,
+    // but a disabled input is only a suggestion to anyone with dev tools or
+    // curl, and this value is printed on the client's copy as "Prepared by".
+    if (!user.full_name.trim()) {
+      return NextResponse.json(
+        { error: 'Add your name on your profile first — it is what the client sees as "Prepared by".' },
+        { status: 409 },
+      );
+    }
+    const intake = IntakeSchema.parse({ ...body, salesperson_name: user.full_name });
 
     const proposal = await withEventLog(null, user.email, 'create', async () =>
       createProposal(intake, user.id),

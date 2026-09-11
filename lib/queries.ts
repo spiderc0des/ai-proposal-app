@@ -37,18 +37,84 @@ export async function findAppUser(authUserId: string): Promise<AppUserRow | null
  * to, rather than needing their auth.users UUID copied out of the Supabase
  * dashboard by hand before they can even be considered.
  *
- * `on conflict (id) do nothing` is what makes this safe to call on every
- * sign-in, not just the first: an already-provisioned row — active or
- * not, whatever role it has — is never touched. This function can only
- * ever create the pending state; only an admin, editing the row directly,
- * moves someone out of it.
+ * Safe to call on every sign-in, not just the first: an existing row —
+ * active or not, whatever its capabilities — has only first_signed_in_at
+ * stamped, and only once. This function can only ever create the pending
+ * state; only an admin moves someone out of it. That includes an invited
+ * person, whose row already exists with the capabilities the admin chose.
  */
 export async function ensurePendingAppUser(id: string, email: string): Promise<void> {
+  // On conflict the only thing touched is first_signed_in_at, and only the
+  // first time (coalesce). Capabilities, name and `active` are never
+  // changed here — which is what keeps an invited person's pre-chosen
+  // capabilities intact when they finally click the link.
   await sql`
-    insert into app_users (id, email, is_sales, is_approver, is_admin, active)
-    values (${id}, ${email}, true, false, false, false)
-    on conflict (id) do nothing
+    insert into app_users (id, email, is_sales, is_approver, is_admin, active, first_signed_in_at)
+    values (${id}, ${email}, true, false, false, false, now())
+    on conflict (id) do update
+       set first_signed_in_at = coalesce(app_users.first_signed_in_at, now())
   `;
+}
+
+/** Case-insensitive, because an admin typing "Priya@Redmoor.com" means the same person. */
+export async function findAppUserByEmail(email: string): Promise<AppUserRow | null> {
+  const rows = await sql`select * from app_users where lower(email) = lower(${email})`;
+  return rows[0] ? AppUserRow.parse(rows[0]) : null;
+}
+
+/**
+ * Records an invitation. Always PENDING: an invite is permission to sign in,
+ * never access itself — an admin still activates the account afterwards.
+ *
+ * The capabilities chosen at invite time are stored now, so activating later
+ * is a single tick rather than a second round of decisions. That is only
+ * safe because the app_users_active_needs_a_capability constraint applies to
+ * active rows alone; an inactive row with no capability is legal.
+ *
+ * Re-inviting a pending person updates what the admin sent this time. It
+ * refuses to touch an ACTIVE row — see the `where not active` below — so a
+ * resend can never silently change the capabilities of someone who already
+ * has access.
+ */
+export async function upsertInvitedUser(params: {
+  id: string;
+  email: string;
+  fullName: string;
+  isSales: boolean;
+  isApprover: boolean;
+  isAdmin: boolean;
+  invitedBy: string;
+}): Promise<AppUserRow | null> {
+  const rows = await sql`
+    insert into app_users
+      (id, email, full_name, is_sales, is_approver, is_admin, active, invited_at, invited_by)
+    values
+      (${params.id}, ${params.email}, ${params.fullName}, ${params.isSales},
+       ${params.isApprover}, ${params.isAdmin}, false, now(), ${params.invitedBy})
+    on conflict (id) do update
+       set full_name   = excluded.full_name,
+           is_sales    = excluded.is_sales,
+           is_approver = excluded.is_approver,
+           is_admin    = excluded.is_admin,
+           invited_at  = now(),
+           invited_by  = excluded.invited_by
+     where not app_users.active
+    returning *
+  `;
+  return rows[0] ? AppUserRow.parse(rows[0]) : null;
+}
+
+/**
+ * A person setting their own display name — which is what clients see as
+ * "Prepared by" and what signs off every proposal email. Self-service on
+ * purpose: routing a typo in your own name through an admin would be
+ * friction with no safety benefit.
+ */
+export async function setOwnName(userId: string, fullName: string): Promise<AppUserRow | null> {
+  const rows = await sql`
+    update app_users set full_name = ${fullName} where id = ${userId} returning *
+  `;
+  return rows[0] ? AppUserRow.parse(rows[0]) : null;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

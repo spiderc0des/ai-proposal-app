@@ -1,11 +1,26 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabaseBrowserClient } from '@/lib/supabase-browser';
+
+/** Set by app/auth/confirm when an invitation link cannot be used. */
+const LINK_ERRORS: Record<string, string> = {
+  link_expired:
+    'That invitation link has expired or has already been used. Ask the admin who invited you to send a new one — or, if you have accepted before, just sign in below.',
+  invalid_link: 'That link is incomplete. Try copying the whole link from the email.',
+};
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [error, setError] = useState('');
+  const [linkError, setLinkError] = useState('');
+
+  // Read in an effect rather than with useSearchParams(), which in Next 15
+  // would require wrapping this page in a Suspense boundary to build.
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('error');
+    if (code && LINK_ERRORS[code]) setLinkError(LINK_ERRORS[code]);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,6 +55,10 @@ export default function LoginPage() {
         means you exist as a user; whether you can do anything here also depends on
         being on the team&apos;s allowlist.
       </p>
+
+      {linkError && status !== 'sent' && (
+        <div className="panel panel-warning mb-4 text-sm">{linkError}</div>
+      )}
 
       {status === 'sent' ? (
         <div className="panel panel-success">

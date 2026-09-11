@@ -49,7 +49,14 @@ create table if not exists app_users (
   -- that misconfiguration impossible to save rather than a support ticket.
   constraint app_users_active_needs_a_capability
     check (not active or is_sales or is_approver or is_admin),
-  created_at  timestamptz not null default now()
+  created_at  timestamptz not null default now(),
+  -- How this person got here. An admin invite sets the first two; signing
+  -- in on your own leaves them null. first_signed_in_at separates "invited,
+  -- never clicked the link" from "signed in, waiting to be activated" — the
+  -- admin page needs that to offer the right action (resend vs activate).
+  invited_at          timestamptz,
+  invited_by          text,
+  first_signed_in_at  timestamptz
 );
 
 -- ── proposals ──────────────────────────────────────────────────────────────

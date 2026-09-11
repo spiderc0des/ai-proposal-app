@@ -3,6 +3,7 @@ import { requireUser, AuthError } from '@/lib/auth';
 import { listAppUsers } from '@/lib/queries';
 import NotAuthorized from '../NotAuthorized';
 import UserAccessTable from './UserAccessTable';
+import InviteForm from './InviteForm';
 
 /**
  * /admin — who can get in, and what they can do once they are in.
@@ -48,6 +49,8 @@ export default async function AdminPage() {
         self-approval works.
       </p>
 
+      <InviteForm />
+
       {pending.length > 0 && (
         <div className="panel panel-warning mb-6 text-sm">
           <p className="font-semibold mb-1">
@@ -56,8 +59,9 @@ export default async function AdminPage() {
               : `${pending.length} people are waiting to be let in`}
           </p>
           <p>
-            They have signed in and have an account, but cannot reach anything
-            until you activate them. They are listed first below.
+            Pending people are listed first below. Someone marked{' '}
+            <b>signed in</b> is waiting on you; someone marked <b>invited</b>{' '}
+            hasn&apos;t clicked their link yet, so you can resend it.
           </p>
         </div>
       )}
@@ -102,5 +106,9 @@ function serialize(u: Awaited<ReturnType<typeof listAppUsers>>[number]) {
     is_approver: u.is_approver,
     is_admin: u.is_admin,
     active: u.active,
+    // Dates cross the Server→Client boundary as strings; see app/p/[id]/page.tsx.
+    invited_at: u.invited_at?.toISOString() ?? null,
+    invited_by: u.invited_by ?? null,
+    first_signed_in_at: u.first_signed_in_at?.toISOString() ?? null,
   };
 }
