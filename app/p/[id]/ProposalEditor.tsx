@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import type { SectionRow } from '@/lib/db-schemas';
 import { daysUntilNudge, canEditSectionContent } from '@/lib/permissions';
+import { countMarkers, markerRefusal } from '@/lib/markers';
 import StatusPill from '../../StatusPill';
 import MarkdownBody from '../../MarkdownBody';
 import ProposalClose from '../../ProposalClose';
@@ -130,6 +131,18 @@ export default function ProposalEditor({
   const canEditContent = canEdit && canEditSectionContent({ status });
 
   const hasContent = sections.some((s) => s.body_md.trim().length > 0);
+
+  /**
+   * Sections still carrying a [NEEDS INPUT] marker. Derived from the live
+   * `sections` state, so it clears the moment the last one is edited out —
+   * no reload. The server refuses the same transitions regardless
+   * (lib/queries.ts); this only stops the buttons offering a request that
+   * would come straight back as a refusal, and says where to look.
+   */
+  const markedSections = sections
+    .map((s) => ({ title: s.title, count: countMarkers(s.body_md) }))
+    .filter((s) => s.count > 0);
+  const blockedByMarkers = markedSections.length > 0;
   // Gates the Resubmit button on a rejected proposal — compared against
   // `initialSections` (the prop, never mutated), i.e. content as it stood
   // when this page loaded. Good enough for the common case (open a
@@ -445,10 +458,35 @@ export default function ProposalEditor({
         </div>
       )}
 
+      {hasContent && blockedByMarkers &&
+        ['in_review', 'rejected', 'pending_approval', 'approved', 'send_failed'].includes(status) && (
+          <div className="panel panel-warning mb-4 text-sm">
+            <p className="font-semibold mb-1">
+              {markedSections.reduce((n, m) => n + m.count, 0)} unresolved [NEEDS INPUT]{' '}
+              {markedSections.reduce((n, m) => n + m.count, 0) === 1 ? 'marker' : 'markers'} — this
+              can&apos;t move forward yet
+            </p>
+            <p className="mb-2">
+              {status === 'pending_approval' && canApprove && !canEdit
+                ? 'Each one is a fact the client would read as a blank. Reject it back to the author, saying what is missing.'
+                : 'Each one is a fact the client would read as a blank. Replace it with the real detail, or remove it — they are highlighted below.'}
+            </p>
+            <ul className="list-disc pl-5">
+              {markedSections.map((m) => (
+                <li key={m.title}>
+                  {m.title}
+                  {m.count > 1 ? ` — ${m.count} markers` : ''}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
       {hasContent && status === 'in_review' && canEdit && (
         <button
           onClick={handleSubmit}
-          disabled={busy !== null}
+          disabled={busy !== null || blockedByMarkers}
+          title={blockedByMarkers ? markerRefusal('submit this for approval', markedSections) : undefined}
           className="btn btn-success"
         >
           {busy === 'submit' ? 'Submitting…' : 'Submit for approval'}
@@ -458,7 +496,12 @@ export default function ProposalEditor({
       {status === 'pending_approval' && canApprove && (
         <div>
           <div className="flex gap-2 items-center">
-            <button onClick={handleApprove} disabled={busy !== null || rejecting} className="btn btn-success">
+            <button
+              onClick={handleApprove}
+              disabled={busy !== null || rejecting || blockedByMarkers}
+              title={blockedByMarkers ? markerRefusal('approve this', markedSections) : undefined}
+              className="btn btn-success"
+            >
               {busy === 'approve' ? 'Approving…' : 'Approve'}
             </button>
             {!rejecting && (
@@ -519,7 +562,8 @@ export default function ProposalEditor({
             <div>
               <button
                 onClick={handleSubmit}
-                disabled={busy !== null || !contentChangedSinceLoad}
+                disabled={busy !== null || !contentChangedSinceLoad || blockedByMarkers}
+                title={blockedByMarkers ? markerRefusal('resubmit this', markedSections) : undefined}
                 className="btn btn-success"
               >
                 {busy === 'submit' ? 'Resubmitting…' : 'Resubmit for approval'}
@@ -536,7 +580,7 @@ export default function ProposalEditor({
 
       {status === 'approved' && (
         <div>
-          <button onClick={handleSend} disabled={busy !== null} className="btn btn-success">
+          <button onClick={handleSend} disabled={busy !== null || blockedByMarkers} className="btn btn-success">
             {busy === 'send' ? 'Sending…' : 'Send to client'}
           </button>
           <p className="label-hint mt-2">
@@ -550,7 +594,7 @@ export default function ProposalEditor({
           <p className="font-semibold mb-2">
             Sending failed. See the event log for exactly which step and why.
           </p>
-          <button onClick={handleSend} disabled={busy !== null} className="btn btn-danger">
+          <button onClick={handleSend} disabled={busy !== null || blockedByMarkers} className="btn btn-danger">
             {busy === 'send' ? 'Retrying…' : 'Retry send'}
           </button>
         </div>
@@ -778,7 +822,7 @@ function SectionCard({
           </button>
         </div>
       ) : section.body_md ? (
-        <MarkdownBody body={section.body_md} />
+        <MarkdownBody body={section.body_md} highlightMarkers />
       ) : (
         <p className="text-sm text-[var(--ink-faint)] italic">Not yet generated.</p>
       )}

@@ -1,4 +1,5 @@
-import { parseMarkdownSubset, parseSectionBlocks } from '@/lib/markdown-subset';
+import { parseMarkdownSubset, parseSectionBlocks, type Run } from '@/lib/markdown-subset';
+import { MARKER_REGEX } from '@/lib/markers';
 
 /**
  * Renders the exact markdown subset the system prompt allows Claude to
@@ -14,27 +15,57 @@ import { parseMarkdownSubset, parseSectionBlocks } from '@/lib/markdown-subset';
  * separately above this component (ProposalEditor's SectionCard) — passing
  * it there would print the name twice.
  */
-export default function MarkdownBody({ body, title }: { body: string; title?: string }) {
+export default function MarkdownBody({
+  body,
+  title,
+  highlightMarkers = false,
+}: {
+  body: string;
+  title?: string;
+  /** Review screen only: make each [NEEDS INPUT] marker impossible to skim
+   *  past, since it now blocks the proposal from moving on. Never set on the
+   *  client's page — they should never see a marker at all. */
+  highlightMarkers?: boolean;
+}) {
   const blocks = title ? parseSectionBlocks(title, body) : parseMarkdownSubset(body);
+  const renderRuns = (runs: Run[]) =>
+    runs.map((r, j) => {
+      const content = highlightMarkers ? markMarkers(r.text) : r.text;
+      return r.bold ? <b key={j}>{content}</b> : <span key={j}>{content}</span>;
+    });
   return (
     <div className="markdown-body">
       {blocks.map((b, i) => {
         if (b.type === 'h2') return <h2 key={i}>{b.text}</h2>;
         if (b.type === 'h3') return <h3 key={i}>{b.text}</h3>;
-        if (b.type === 'p')
-          return (
-            <p key={i}>
-              {b.runs.map((r, j) => (r.bold ? <b key={j}>{r.text}</b> : <span key={j}>{r.text}</span>))}
-            </p>
-          );
+        if (b.type === 'p') return <p key={i}>{renderRuns(b.runs)}</p>;
         return (
           <ul key={i}>
             {b.items.map((runs, j) => (
-              <li key={j}>{runs.map((r, k) => (r.bold ? <b key={k}>{r.text}</b> : <span key={k}>{r.text}</span>))}</li>
+              <li key={j}>{renderRuns(runs)}</li>
             ))}
           </ul>
         );
       })}
     </div>
+  );
+}
+
+/** Splits text around each marker and wraps the markers in a <mark>. */
+function markMarkers(text: string): React.ReactNode {
+  const parts = text.split(new RegExp(`(${MARKER_REGEX.source})`, 'gi'));
+  if (parts.length === 1) return text;
+  return parts.map((part, i) =>
+    i % 2 === 1 ? (
+      <mark
+        key={i}
+        className="rounded px-1 font-medium"
+        style={{ background: 'var(--amber-bg)', color: 'var(--amber)' }}
+      >
+        {part}
+      </mark>
+    ) : (
+      part
+    ),
   );
 }

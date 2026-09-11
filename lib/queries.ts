@@ -3,6 +3,7 @@ import { sql } from './db';
 import { SECTIONS } from './sections';
 import { contentHash, hashObject } from './hash';
 import type { Intake } from './schemas';
+import { MARKER_SQL_PATTERN, countMarkers, markerRefusal } from './markers';
 import {
   AppUserRow, EventRow, MaterialRow, ProposalRow, SectionRow,
 } from './db-schemas';
@@ -448,6 +449,26 @@ export async function editSection(params: {
 /* ── the state machine transitions, each a guarded UPDATE ────────────────── */
 
 /**
+ * Sections of a proposal that still contain a [NEEDS INPUT] marker, with how
+ * many each — used to tell the caller exactly where to look when a
+ * transition is refused. See lib/markers.ts for why this gate exists.
+ */
+export async function listSectionsWithMarkers(
+  proposalId: string,
+): Promise<{ section_key: string; title: string; count: number }[]> {
+  const rows = await sql`
+    select section_key, title, body_md from proposal_sections
+     where proposal_id = ${proposalId} and body_md ilike ${MARKER_SQL_PATTERN}
+     order by order_index
+  `;
+  return rows.map((r) => ({
+    section_key: String(r.section_key),
+    title: String(r.title),
+    count: countMarkers(String(r.body_md)),
+  }));
+}
+
+/**
  * Also the resubmit path for a `rejected` proposal — not a separate
  * function, because it's the same transition (→ `pending_approval`) with
  * the same guarantees. `rejected_reason` is cleared on the way through:
@@ -475,17 +496,31 @@ export async function submitForApproval(
        and status in ('in_review', 'rejected')
        and version = ${expectedVersion}
        and not exists (select 1 from deliveries where proposal_id = proposals.id)
+       -- No unresolved [NEEDS INPUT] marker in any section. In the WHERE
+       -- clause, not a check beforehand, so an edit landing between a check
+       -- and this write cannot slip a marker through (lib/markers.ts).
+       and not exists (
+         select 1 from proposal_sections ps
+          where ps.proposal_id = proposals.id
+            and ps.body_md ilike ${MARKER_SQL_PATTERN}
+       )
      returning *
   `;
   if (!rows[0]) {
-    // Was it the version, the status, or an existing delivery? Tell the
-    // caller which.
+    // Was it the version, the status, an existing delivery, or a marker?
+    // Tell the caller which — in that order, so a stale page is reported as
+    // stale rather than as whatever else happens to be true.
     const current = await getProposal(proposalId);
     if (!current) throw new ConflictError('Proposal not found.');
     if (current.version !== expectedVersion) throw new VersionConflictError();
     const [delivered] = await sql`select 1 from deliveries where proposal_id = ${proposalId}`;
     if (delivered) throw new ConflictError('This proposal has already been sent and cannot be resubmitted.');
-    throw new ConflictError(`Cannot submit from status '${current.status}'.`);
+    if (current.status !== 'in_review' && current.status !== 'rejected') {
+      throw new ConflictError(`Cannot submit from status '${current.status}'.`);
+    }
+    const marked = await listSectionsWithMarkers(proposalId);
+    if (marked.length) throw new ConflictError(markerRefusal('submit this for approval', marked));
+    throw new ConflictError('Could not submit — reload the page and try again.');
   }
   return ProposalRow.parse(rows[0]);
 }
@@ -555,6 +590,16 @@ export async function decideApproval(params: {
        and status = 'pending_approval'
        and version = ${params.expectedVersion}
        and not exists (select 1 from deliveries where proposal_id = proposals.id)
+       -- Submit already refuses a marked proposal, so in normal use nothing
+       -- marked reaches this point. It is repeated for everything that got
+       -- to pending_approval before the gate existed, and for any path into
+       -- this status added later. An approver should be told here, not
+       -- discover it when Send refuses.
+       and not exists (
+         select 1 from proposal_sections ps
+          where ps.proposal_id = proposals.id
+            and ps.body_md ilike ${MARKER_SQL_PATTERN}
+       )
      returning *
   `;
   if (!rows[0]) {
@@ -563,7 +608,16 @@ export async function decideApproval(params: {
     if (current.version !== params.expectedVersion) throw new VersionConflictError();
     const [delivered] = await sql`select 1 from deliveries where proposal_id = ${params.proposalId}`;
     if (delivered) throw new ConflictError('This proposal has already been sent and cannot be approved again.');
-    throw new ConflictError(`Cannot approve from status '${current.status}'.`);
+    if (current.status !== 'pending_approval') {
+      throw new ConflictError(`Cannot approve from status '${current.status}'.`);
+    }
+    const marked = await listSectionsWithMarkers(params.proposalId);
+    if (marked.length) {
+      throw new ConflictError(
+        markerRefusal('approve this', marked) + ' Reject it back to the author, saying what is missing.',
+      );
+    }
+    throw new ConflictError('Could not approve — reload the page and try again.');
   }
   return ProposalRow.parse(rows[0]);
 }
@@ -605,6 +659,15 @@ export async function checkSendPreconditions(proposalId: string): Promise<
   const [existing] = await sql`select 1 from deliveries where proposal_id = ${proposalId}`;
   if (existing) {
     return { ok: false, reason: 'Already sent.' };
+  }
+
+  // The last line before the client reads it. Submit and approve both
+  // already refuse a marked proposal; this catches anything approved before
+  // those gates existed. Checked against the live sections, not the approved
+  // hash, because it is the text about to be delivered that matters.
+  const marked = await listSectionsWithMarkers(proposalId);
+  if (marked.length) {
+    return { ok: false, reason: markerRefusal('send this to the client', marked) };
   }
   return { ok: true, proposal };
 }
