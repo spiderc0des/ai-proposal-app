@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import "./globals.css";
+import { cookies } from 'next/headers';
 import { currentUser, sessionEmail } from '@/lib/auth';
 import MobileNav from './MobileNav';
+import ThemeToggle from './ThemeToggle';
 
 const font = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-sans', display: 'swap' });
 
@@ -16,11 +18,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // is that session an activated app_users row (currentUser). A pending
   // user has a session but no row — they still need the nav (to reach
   // Profile > Sign out), so gating is on sessionEmail, not on currentUser.
-  const [email, user] = await Promise.all([sessionEmail(), currentUser()]);
+  const [email, user, cookieStore] = await Promise.all([sessionEmail(), currentUser(), cookies()]);
   const initial = email ? email[0].toUpperCase() : '?';
 
+  // An explicit choice from ThemeToggle, applied before anything is sent so
+  // the first paint is already right. Absent (never chosen) means follow the
+  // OS, which is the CSS default — so no attribute is set at all.
+  const savedTheme = cookieStore.get('theme')?.value;
+  const theme = savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : undefined;
+
   return (
-    <html lang="en" className={font.variable}>
+    <html lang="en" className={font.variable} data-theme={theme}>
       <body className="min-h-screen">
         <header className="relative sticky top-0 z-10 border-b border-[var(--rule)] bg-[var(--paper)]/95 backdrop-blur px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
           <a href={email ? '/proposals' : '/login'} className="flex items-center gap-2 font-semibold tracking-tight text-[var(--ink)] shrink-0">
@@ -55,6 +63,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 )}
               </nav>
               <MobileNav isAdmin={Boolean(user?.is_admin)} />
+              <span className="ml-2 inline-flex"><ThemeToggle /></span>
               <a
                 href="/profile"
                 title={email}
@@ -64,7 +73,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </a>
             </div>
           ) : (
-            <a href="/login" className="btn btn-primary">Sign in</a>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <a href="/login" className="btn btn-primary">Sign in</a>
+            </div>
           )}
         </header>
         {/* Widened from max-w-3xl so /new can lay its fields out in real

@@ -1,12 +1,27 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Tokens. Light is the bare :root; dark redefines the same names under
-   prefers-color-scheme. Every color everywhere in the app is one of these
-   variables — nothing hard-codes a hex value outside this block, so the
-   whole app re-themes from here.
+   Tokens. Light is the bare :root; dark redefines the same names. Every
+   color everywhere in the app is one of these variables — nothing
+   hard-codes a hex value outside this block, so the whole app re-themes
+   from here.
+
+   Three states, not two:
+     • no data-theme on <html>  → follow the OS (prefers-color-scheme)
+     • data-theme="light"       → light, even on a dark OS
+     • data-theme="dark"        → dark, even on a light OS
+   The attribute is set server-side from the `theme` cookie (app/layout.tsx),
+   so the first paint is already the right theme — no flash of the wrong one.
+
+   The dark palette is written out twice below — once for the OS case, once
+   for the explicit choice — because a media query cannot share a rule with
+   an attribute selector. They must stay identical; change both or neither.
    ═══════════════════════════════════════════════════════════════════════════ */
 :root {
+  /* Native controls — date pickers, checkboxes, scrollbars — follow this,
+     not the tokens. Without it they stay light on a dark page. */
+  color-scheme: light;
+
   --paper: #fbfcfe;
   --surface: #f1f5f9;
   --surface-2: #e2e8f0;
@@ -35,8 +50,11 @@
   --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08);
 }
 
+/* Dark, because the OS asks for it — unless the person chose light. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
     --paper: #0a0f1a;
     --surface: #111a2b;
     --surface-2: #182338;
@@ -61,6 +79,48 @@
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.4);
   }
+}
+
+/* Dark, because the person chose it — whatever the OS says. */
+:root[data-theme="dark"] {
+    color-scheme: dark;
+
+    --paper: #0a0f1a;
+    --surface: #111a2b;
+    --surface-2: #182338;
+    --ink: #e6edf5;
+    --ink-soft: #a8b6c8;
+    --ink-faint: #64748b;
+    --rule: #24304a;
+    --rule-soft: #1a2338;
+
+    --accent: #38bdf8;
+    --accent-hover: #7dd3fc;
+    --accent-bg: #0c2942;
+    --accent-ring: rgba(56, 189, 248, 0.35);
+
+    --amber: #fbbf24;
+    --amber-bg: #3a2a0d;
+    --red: #f87171;
+    --red-bg: #3a1414;
+    --green: #4ade80;
+    --green-bg: #0f2c1c;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* The toggle shows the icon for the theme a click would switch TO. Driven
+   by the same three selectors as the palette, so the icon can never
+   disagree with the colours on screen, and it is right on the very first
+   paint — no JavaScript has to run before it knows which to show. */
+.theme-icon-to-light { display: none; }
+.theme-icon-to-dark  { display: inline-flex; }
+:root[data-theme="dark"] .theme-icon-to-light { display: inline-flex; }
+:root[data-theme="dark"] .theme-icon-to-dark  { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .theme-icon-to-light { display: inline-flex; }
+  :root:not([data-theme="light"]) .theme-icon-to-dark  { display: none; }
 }
 
 * { border-color: var(--rule); }
