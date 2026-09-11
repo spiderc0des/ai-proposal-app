@@ -40,7 +40,7 @@ export default async function SharedProposalPage({ params }: { params: Promise<{
           <div className="divider mb-6" />
 
           {sections.map((s) => (
-            <MarkdownBody key={s.section_key} body={s.body_md} />
+            <MarkdownBody key={s.section_key} title={s.title} body={s.body_md} />
           ))}
 
           <ProposalClose salespersonName={proposal.salesperson_name} />

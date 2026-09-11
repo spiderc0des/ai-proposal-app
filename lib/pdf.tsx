@@ -1,6 +1,6 @@
 import 'server-only';
 import { Document, Page, Text, View, StyleSheet, renderToBuffer } from '@react-pdf/renderer';
-import { parseMarkdownSubset, type Block, type Run } from './markdown-subset';
+import { parseSectionBlocks, type Block, type Run } from './markdown-subset';
 import type { Intake } from './schemas';
 import type { SectionRow } from './db-schemas';
 import { PROPOSAL_CLOSE } from './close';
@@ -103,7 +103,7 @@ export function ProposalDocument({
         <View style={styles.hr} />
 
         {sections.map((s) => (
-          <RenderBlocks key={s.section_key} blocks={parseMarkdownSubset(s.body_md)} />
+          <RenderBlocks key={s.section_key} blocks={parseSectionBlocks(s.title, s.body_md)} />
         ))}
 
         {/* Rendered, never generated — see lib/close.ts. `wrap={false}` keeps

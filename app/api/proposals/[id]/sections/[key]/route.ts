@@ -54,6 +54,7 @@ export async function PATCH(
           sectionKey: key,
           body_md: body.body_md,
           editedBy: user.id,
+          actorEmail: user.email,
           expectedVersion: body.version,
         }),
       () => (before ? { section_key: key, before: before.body_md, after: body.body_md } : {}),

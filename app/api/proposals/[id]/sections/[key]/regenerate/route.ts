@@ -80,6 +80,7 @@ export async function POST(
           gaps: outcome.data.section.gaps,
           model: outcome.model,
           requestId: outcome.requestId,
+          actorEmail: user.email,
         });
 
         return { section: outcome.data.section };

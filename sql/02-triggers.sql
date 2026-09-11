@@ -64,8 +64,21 @@ begin
            version               = version + 1
      where id = new.proposal_id;
 
+    -- Attributed to the person whose edit caused this, not to 'system'.
+    -- lib/queries.ts (editSection / regenerateSectionRow) publishes their
+    -- email with set_config('app.actor', …, true) inside the same
+    -- transaction; the `true` second argument to current_setting means
+    -- "return null if unset" rather than raising, so a write from psql or a
+    -- migration still works and simply falls back.
+    --
+    -- This exists because the row used to say 'system', which is true of
+    -- the mechanism and useless to a reader: the entire point of the event
+    -- is that somebody's edit invalidated an approval, and the only
+    -- question worth asking of it is whose.
     insert into events (proposal_id, actor, step, ok, detail)
-    values (new.proposal_id, 'system', 'approval_revoked', true,
+    values (new.proposal_id,
+            coalesce(nullif(current_setting('app.actor', true), ''), 'system'),
+            'approval_revoked', true,
             jsonb_build_object(
               'reason',       'section text edited after approval',
               'section_key',  new.section_key,

@@ -33,6 +33,39 @@ function parseInline(line: string): Run[] {
   return runs.length ? runs : [{ text: line, bold: false }];
 }
 
+/**
+ * Same parse, plus a guaranteed heading — the fix for a real bug: whether a
+ * section showed its name on the client page and in the PDF depended
+ * entirely on whether Claude happened to open that section's body with a
+ * matching `## Heading` line. The system prompt (rule 6) allows headings,
+ * it never requires one, so it was inconsistent by construction — one
+ * proposal had "Introduction" over every section, the next had none at all,
+ * with nothing about either being wrong on its own terms.
+ *
+ * The section's `title` (lib/sections.ts) is the reliable value — it always
+ * exists and is never something Claude writes — so it is what gets shown,
+ * not whatever the model did or didn't put at the top of the body. A
+ * leading heading that already names this section (case-insensitively; a
+ * model that wrote "## Pricing Overview" for the pricing section still
+ * counts) is treated as satisfying it rather than duplicated — some drafts
+ * already have one, and this must not print it twice.
+ */
+export function parseSectionBlocks(title: string, md: string): Block[] {
+  const blocks = parseMarkdownSubset(md);
+  const first = blocks[0];
+  const alreadyTitled =
+    first &&
+    (first.type === 'h2' || first.type === 'h3') &&
+    normaliseHeading(first.text) === normaliseHeading(title);
+
+  if (alreadyTitled) return blocks;
+  return [{ type: 'h2', text: title }, ...blocks];
+}
+
+function normaliseHeading(text: string): string {
+  return text.trim().toLowerCase();
+}
+
 export function parseMarkdownSubset(md: string): Block[] {
   const lines = md.replace(/\r\n/g, '\n').split('\n');
   const blocks: Block[] = [];

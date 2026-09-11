@@ -284,8 +284,12 @@ export async function regenerateSectionRow(params: {
   gaps: string[];
   model: string;
   requestId: string | null;
+  /** Whoever triggered this regeneration — see editSection for why. */
+  actorEmail: string;
 }): Promise<void> {
   await sql.begin(async (tx) => {
+    await tx`select set_config('app.actor', ${params.actorEmail}, true)`;
+
     // The optimistic lock lives on `proposals.version`, checked here before
     // the one section row is touched — a salesperson editing a sibling
     // section while this regeneration was in flight loses the race cleanly.
@@ -334,9 +338,24 @@ export async function editSection(params: {
   sectionKey: string;
   body_md: string;
   editedBy: string;
+  /** The email of whoever is doing this, for the trigger to attribute to —
+   *  see the `set local` below. Distinct from editedBy, which is the user
+   *  ID stored on the section row. */
+  actorEmail: string;
   expectedVersion: number;
 }): Promise<void> {
   await sql.begin(async (tx) => {
+    // Hand the acting person's identity to the database for the duration of
+    // this transaction, so sections_revoke_approval can name them on the
+    // `approval_revoked` row it writes. Without it that row says 'system',
+    // which is true of the mechanism and useless to a reader: the whole
+    // point of the event is that somebody's edit invalidated an approval,
+    // and the only question worth asking is whose.
+    //
+    // `set local` scopes it to this transaction, so it cannot leak onto the
+    // next query that happens to reuse this pooled connection.
+    await tx`select set_config('app.actor', ${params.actorEmail}, true)`;
+
     const [current] = await tx`select version from proposals where id = ${params.proposalId}`;
     if (!current || current.version !== params.expectedVersion) {
       throw new VersionConflictError();
