@@ -117,13 +117,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     await markSent(id, pdfPath, token, expiresAt);
 
-    // Best-effort mirror to a spreadsheet (not configured in this build —
-    // logs 'skipped' and moves on). Never allowed to undo a delivery that
-    // already succeeded.
-    await withEventLog(id, user.email, 'log:mirror', async () => ({ skipped: true, reason: 'not configured' })).catch(
-      () => {},
-    );
-
     return NextResponse.json({
       status: 'sent',
       already_sent: alreadySent,
