@@ -151,10 +151,14 @@ export default async function ProposalsPage({
             <a href={`/p/${p.id}`} className="flex items-center justify-between gap-4 flex-1 min-w-0">
               <div className="min-w-0">
                 <p className="font-medium truncate">{p.company_name}</p>
-                <p className="text-xs text-[var(--ink-faint)] truncate">
-                  {p.client_name}
-                  {user.is_admin && ` · by ${p.salesperson_name}`}
-                  {' · updated '}
+                <p className="text-xs text-[var(--ink-soft)] truncate">{p.client_name}</p>
+                {/* Plain text, not a mailto: link — this whole row is already
+                    an <a> to the proposal, and a link nested inside a link
+                    is invalid HTML that browsers resolve unpredictably. */}
+                <p className="text-xs text-[var(--ink-faint)] truncate">{p.client_email}</p>
+                <p className="text-xs text-[var(--ink-faint)] truncate mt-0.5">
+                  {user.is_admin && `by ${p.salesperson_name} · `}
+                  {'updated '}
                   {new Date(p.updated_at).toLocaleDateString()}
                 </p>
               </div>
